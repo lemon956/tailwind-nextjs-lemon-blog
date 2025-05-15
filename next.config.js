@@ -82,6 +82,10 @@ module.exports = () => {
       unoptimized,
     },
     async headers() {
+      // 导出模式下不返回headers
+      if (process.env.EXPORT) {
+        return []
+      }
       return [
         {
           source: '/(.*)',
