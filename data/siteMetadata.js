@@ -6,7 +6,7 @@ const siteMetadata = {
   description: "Lemon's personal blog website",
   language: 'en-us',
   theme: 'system', // system, dark or light
-  siteUrl: 'https://lemon9527.top',
+  siteUrl: 'https://blog.lemon9527.top',
   siteRepo: 'https://github.com/lemon956/tailwind-nextjs-lemon-blog',
   siteLogo: `${process.env.BASE_PATH || ''}/static/images/logo.png`,
   socialBanner: `${process.env.BASE_PATH || ''}/static/images/twitter-card.png`,
