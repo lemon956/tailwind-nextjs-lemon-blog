@@ -1,3 +1,31 @@
-<?xml version="1.0" encoding="UTF-8" standalone="no"?>
-<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
-<svg version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" preserveAspectRatio="xMidYMid meet" viewBox="344.5639097744361 330.27819548872174 111.73684210526318 91.21804511278197" width="53.87" height="43.61"><defs><path d="M453.3 331.28L453.3 359.85L388.64 418.5L388.64 388.42L453.3 331.28Z" id="aFZf6T5ED"></path><linearGradient id="gradientb2ThqnP5Op" gradientUnits="userSpaceOnUse" x1="420.97" y1="331.28" x2="420.97" y2="418.5"><stop style="stop-color: #06b6d4;stop-opacity: 1" offset="0%"></stop><stop style="stop-color: #67e8f9;stop-opacity: 1" offset="100%"></stop></linearGradient><path d="M410.23 331.28L410.23 359.85L345.56 418.5L345.56 388.42L410.23 331.28Z" id="a9fehgwfM"></path><linearGradient id="gradientk1wNV9Ostb" gradientUnits="userSpaceOnUse" x1="377.89" y1="331.28" x2="377.89" y2="418.5"><stop style="stop-color: #06b6d4;stop-opacity: 1" offset="0%"></stop><stop style="stop-color: #67e8f9;stop-opacity: 1" offset="100%"></stop></linearGradient></defs><g><g><use xlink:href="#aFZf6T5ED" opacity="1" fill="url(#gradientb2ThqnP5Op)"></use></g><g><use xlink:href="#a9fehgwfM" opacity="1" fill="url(#gradientk1wNV9Ostb)"></use></g></g></svg>
+<?xml version="1.0" encoding="UTF-8"?>
+<svg version="1.1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="40" height="40">
+  <defs>
+    <linearGradient id="lemonGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#FFD700;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#FFA500;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="leafGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#32CD32;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#228B22;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- 柠檬主体 -->
+  <ellipse cx="50" cy="55" rx="25" ry="30" fill="url(#lemonGradient)" stroke="#DAA520" stroke-width="2"/>
+  
+  <!-- 高光 -->
+  <ellipse cx="42" cy="45" rx="6" ry="10" fill="#FFFF99" opacity="0.6"/>
+  
+  <!-- 叶子 -->
+  <ellipse cx="45" cy="25" rx="8" ry="4" fill="url(#leafGradient)" transform="rotate(-30 45 25)"/>
+  
+  <!-- 茎 -->
+  <path d="M45 25 Q50 15 60 20" stroke="url(#leafGradient)" stroke-width="3" fill="none" stroke-linecap="round"/>
+  
+  <!-- 纹理点 -->
+  <circle cx="55" cy="50" r="1" fill="#DAA520" opacity="0.5"/>
+  <circle cx="60" cy="60" r="1" fill="#DAA520" opacity="0.5"/>
+  <circle cx="52" cy="65" r="1" fill="#DAA520" opacity="0.5"/>
+  <circle cx="45" cy="60" r="1" fill="#DAA520" opacity="0.5"/>
+</svg>
