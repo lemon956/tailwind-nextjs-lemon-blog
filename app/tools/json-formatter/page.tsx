@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import { genPageMetadata } from 'app/seo'
 
 // 修复选项类型
@@ -239,13 +239,93 @@ export default function JsonFormatter() {
   const [showToast, setShowToast] = useState(false)
   const [fixLog, setFixLog] = useState<string[]>([])
   const [showFixMenu, setShowFixMenu] = useState(false)
+  const [isCompressed, setIsCompressed] = useState(false) // 是否为压缩模式
+  const [inputHistory, setInputHistory] = useState<string[]>([]) // 历史记录
+  const [historyIndex, setHistoryIndex] = useState(-1) // 当前历史索引
   const inputRef = useRef<HTMLTextAreaElement>(null)
+
+  // 带历史记录的输入更新
+  const updateInput = useCallback(
+    (value: string) => {
+      setInput(value)
+      setError('') // 输入时清除错误
+
+      // 添加历史记录（最多保存10次）
+      setInputHistory((prev) => {
+        // 如果当前不在历史的最后位置，删除后面的历史
+        const newHistory = historyIndex >= 0 ? prev.slice(0, historyIndex + 1) : prev
+        // 添加新记录并限制在10条以内
+        const updated = [...newHistory, value].slice(-10)
+        // 更新索引
+        setHistoryIndex(updated.length - 1)
+        return updated
+      })
+
+      // 自动尝试格式化（静默，不显示错误）
+      if (value.trim()) {
+        try {
+          // 预处理输入
+          const processedText = preprocessJSON(value)
+          let parsed = JSON.parse(processedText)
+
+          // 如果解析结果是字符串，尝试再次解析（处理转义的 JSON）
+          if (typeof parsed === 'string') {
+            try {
+              parsed = JSON.parse(preprocessJSON(parsed))
+            } catch {
+              // 第二次解析失败，使用第一次的结果
+            }
+          }
+
+          const formatted = JSON.stringify(parsed, null, indent)
+          setOutput(formatted)
+          setParsedJson(parsed)
+          setIsCompressed(false)
+        } catch {
+          // 输入时解析失败不显示错误，保持之前的输出
+        }
+      } else {
+        // 清空输入时也清空输出
+        setOutput('')
+        setParsedJson(null)
+        setIsCompressed(false)
+      }
+    },
+    [historyIndex, indent]
+  )
+
+  // 撤销操作（Ctrl+Z）
+  const handleUndo = useCallback(() => {
+    if (historyIndex > 0) {
+      const newIndex = historyIndex - 1
+      setHistoryIndex(newIndex)
+      setInput(inputHistory[newIndex])
+      setError('') // 撤销时清除错误
+    }
+  }, [historyIndex, inputHistory])
 
   // 显示复制成功的浮窗提示
   const showCopyToast = () => {
     setShowToast(true)
     setTimeout(() => setShowToast(false), 2000)
   }
+
+  // 监听键盘事件 (Ctrl+Z)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
+        const target = e.target as HTMLElement
+        // 只在输入框内响应
+        if (target.id === 'input') {
+          e.preventDefault()
+          handleUndo()
+        }
+      }
+    }
+
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [handleUndo])
 
   // 点击外部关闭修复菜单
   useEffect(() => {
@@ -327,10 +407,12 @@ export default function JsonFormatter() {
       const formatted = JSON.stringify(parsed, null, indent)
       setOutput(formatted)
       setParsedJson(parsed)
+      setIsCompressed(false)
     } catch (err) {
       setError(`JSON 解析错误: ${err instanceof Error ? err.message : '未知错误'}`)
       setOutput('')
       setParsedJson(null)
+      setIsCompressed(false)
     }
   }
 
@@ -341,20 +423,23 @@ export default function JsonFormatter() {
       const parsed = parseJSON(input)
       const compressed = JSON.stringify(parsed)
       setOutput(compressed)
-      setParsedJson(parsed)
+      setParsedJson(null) // 压缩模式不显示树形视图
+      setIsCompressed(true)
     } catch (err) {
       setError(`JSON 解析错误: ${err instanceof Error ? err.message : '未知错误'}`)
       setOutput('')
       setParsedJson(null)
+      setIsCompressed(false)
     }
   }
 
   const handleClear = () => {
-    setInput('')
+    updateInput('')
     setOutput('')
     setError('')
     setParsedJson(null)
     setFixLog([])
+    setIsCompressed(false)
   }
 
   const handleFix = (option: FixOption = 'all') => {
@@ -481,7 +566,7 @@ export default function JsonFormatter() {
           logs.push('📊 字符数量未变化')
         }
 
-        setInput(text)
+        updateInput(text)
         setFixLog(logs)
         setError('')
       } catch (parseErr) {
@@ -518,8 +603,7 @@ export default function JsonFormatter() {
       hobbies: ['阅读', '编程', '旅行'],
       active: true,
     }
-    setInput(JSON.stringify(sample))
-    setError('')
+    updateInput(JSON.stringify(sample))
     setFixLog([])
   }
 
@@ -722,7 +806,7 @@ export default function JsonFormatter() {
                       ref={inputRef}
                       id="input"
                       value={input}
-                      onChange={(e) => setInput(e.target.value)}
+                      onChange={(e) => updateInput(e.target.value)}
                       placeholder="在此粘贴或输入 JSON 数据..."
                       className="min-h-[300px] flex-1 resize-none overflow-auto bg-transparent p-4 font-mono text-sm text-gray-900 focus:outline-none dark:text-gray-100"
                       spellCheck={false}
@@ -731,31 +815,68 @@ export default function JsonFormatter() {
                   </div>
                 </div>
 
-                {/* 输出框 - 带折叠功能的树形视图 */}
+                {/* 输出框 - 带行号和内容 */}
                 <div className="flex flex-col">
                   <label
                     htmlFor="output"
                     className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300"
                   >
-                    格式化结果（点击 ▶ ▼ 折叠/展开）
+                    {isCompressed ? '压缩结果' : '格式化结果（点击 ▶ ▼ 折叠/展开）'}
                   </label>
-                  <div
-                    className="overflow-auto rounded-md border border-gray-300 bg-white p-4 dark:border-gray-600 dark:bg-gray-900"
-                    style={{
-                      minHeight: '300px',
-                      maxHeight: 'calc(100vh - 350px)',
-                    }}
-                  >
-                    {parsedJson ? (
-                      <div className="w-full">
-                        <JsonNode data={parsedJson} indent={indent} onCopySuccess={showCopyToast} />
+                  {output || parsedJson ? (
+                    <div className="flex gap-2 overflow-auto rounded-md border border-gray-300 bg-white dark:border-gray-600 dark:bg-gray-900">
+                      {/* 行号 */}
+                      {output && (
+                        <div className="flex flex-col bg-gray-50 py-4 pr-2 pl-4 dark:bg-gray-800">
+                          {output.split('\n').map((_, i) => (
+                            <div
+                              key={i}
+                              className="text-right font-mono text-sm text-gray-400 select-none dark:text-gray-500"
+                              style={{ lineHeight: '1.5rem' }}
+                            >
+                              {i + 1}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {/* 内容区域 */}
+                      <div
+                        className="flex-1 overflow-auto"
+                        style={{
+                          minHeight: '300px',
+                          maxHeight: 'calc(100vh - 350px)',
+                        }}
+                      >
+                        {isCompressed && output ? (
+                          // 压缩模式：显示文本
+                          <pre className="py-4 pr-4 font-mono text-sm text-gray-900 dark:text-gray-100">
+                            {output}
+                          </pre>
+                        ) : parsedJson ? (
+                          // 格式化模式：显示树形视图
+                          <div className="w-full p-4">
+                            <JsonNode
+                              data={parsedJson}
+                              indent={indent}
+                              onCopySuccess={showCopyToast}
+                            />
+                          </div>
+                        ) : null}
                       </div>
-                    ) : (
-                      <p className="text-sm text-gray-500 dark:text-gray-400">
+                    </div>
+                  ) : (
+                    <div className="overflow-auto rounded-md border border-gray-300 bg-white p-4 dark:border-gray-600 dark:bg-gray-900">
+                      <p
+                        className="text-sm text-gray-500 dark:text-gray-400"
+                        style={{
+                          minHeight: '300px',
+                          maxHeight: 'calc(100vh - 350px)',
+                        }}
+                      >
                         格式化后的 JSON 将显示在这里...
                       </p>
-                    )}
-                  </div>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -771,7 +892,11 @@ export default function JsonFormatter() {
                   </li>
                   <li className="flex items-start">
                     <span className="mr-2">•</span>
-                    <span>输出结果支持折叠/展开 JSON 节点</span>
+                    <span>支持 Ctrl+Z 撤销输入（最多10次）</span>
+                  </li>
+                  <li className="flex items-start">
+                    <span className="mr-2">•</span>
+                    <span>格式化显示树形视图，压缩显示文本</span>
                   </li>
                   <li className="flex items-start">
                     <span className="mr-2">•</span>
@@ -788,6 +913,10 @@ export default function JsonFormatter() {
                   <li className="flex items-start">
                     <span className="mr-2">•</span>
                     <span>可以复制单个键值对或整个对象/数组</span>
+                  </li>
+                  <li className="flex items-start">
+                    <span className="mr-2">•</span>
+                    <span>点击修复格式右侧箭头查看更多选项</span>
                   </li>
                 </ul>
               </div>
