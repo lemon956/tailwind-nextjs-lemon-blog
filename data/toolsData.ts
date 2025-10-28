@@ -17,7 +17,7 @@ const toolsData: ToolGroup[] = [
       {
         title: 'Json',
         description: 'json格式化',
-        href: 'https://json.cn',
+        href: '/tools/json-formatter',
         icon: '/static/favicons/tools_icon/json.ico',
       },
       {
