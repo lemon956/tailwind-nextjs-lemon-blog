@@ -3,6 +3,47 @@
 import { useState, useRef, useEffect } from 'react'
 import { genPageMetadata } from 'app/seo'
 
+// 修复选项类型
+type FixOption =
+  | 'all' // 全部修复
+  | 'remove-bom' // 移除 BOM
+  | 'trim-whitespace' // 移除首尾空白
+  | 'fix-escaped-json' // 修复转义 JSON
+  | 'fix-newlines' // 修复换行符
+  | 'normalize-newlines' // 标准化换行符
+  | 'remove-empty-lines' // 移除多余空行
+
+// 修复选项描述
+const FIX_OPTIONS: { value: FixOption; label: string; description: string }[] = [
+  { value: 'all', label: '🔧 全部修复', description: '执行所有修复操作' },
+  { value: 'remove-bom', label: '移除 BOM 字符', description: '删除文件开头的 BOM 标记' },
+  {
+    value: 'trim-whitespace',
+    label: '移除首尾空白',
+    description: '删除 JSON 字符串首尾的空格和换行',
+  },
+  {
+    value: 'fix-escaped-json',
+    label: '修复转义 JSON',
+    description: '处理裸露转义格式（如 {\\"key\\":\\"value\\"}）',
+  },
+  {
+    value: 'fix-newlines',
+    label: '修复换行符错误',
+    description: '移除键名和值中的非法换行符',
+  },
+  {
+    value: 'normalize-newlines',
+    label: '标准化换行符',
+    description: '将 \\r\\n 和 \\r 统一为 \\n',
+  },
+  {
+    value: 'remove-empty-lines',
+    label: '移除多余空行',
+    description: '删除连续超过2个的空行',
+  },
+]
+
 // JSON 节点组件 - 用于递归显示 JSON 树
 interface JsonNodeProps {
   data: unknown
@@ -196,6 +237,8 @@ export default function JsonFormatter() {
   const [indent, setIndent] = useState(2)
   const [parsedJson, setParsedJson] = useState<unknown>(null)
   const [showToast, setShowToast] = useState(false)
+  const [fixLog, setFixLog] = useState<string[]>([])
+  const [showFixMenu, setShowFixMenu] = useState(false)
   const inputRef = useRef<HTMLTextAreaElement>(null)
 
   // 显示复制成功的浮窗提示
@@ -203,6 +246,23 @@ export default function JsonFormatter() {
     setShowToast(true)
     setTimeout(() => setShowToast(false), 2000)
   }
+
+  // 点击外部关闭修复菜单
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (showFixMenu) {
+        const target = event.target as HTMLElement
+        // 检查点击是否在菜单外部
+        const menu = document.querySelector('.fix-menu-container')
+        if (menu && !menu.contains(target)) {
+          setShowFixMenu(false)
+        }
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [showFixMenu])
 
   // 预处理 JSON 字符串，修复常见格式问题
   const preprocessJSON = (text: string): string => {
@@ -262,6 +322,7 @@ export default function JsonFormatter() {
   const handleFormat = () => {
     try {
       setError('')
+      setFixLog([])
       const parsed = parseJSON(input)
       const formatted = JSON.stringify(parsed, null, indent)
       setOutput(formatted)
@@ -276,6 +337,7 @@ export default function JsonFormatter() {
   const handleCompress = () => {
     try {
       setError('')
+      setFixLog([])
       const parsed = parseJSON(input)
       const compressed = JSON.stringify(parsed)
       setOutput(compressed)
@@ -292,19 +354,146 @@ export default function JsonFormatter() {
     setOutput('')
     setError('')
     setParsedJson(null)
+    setFixLog([])
   }
 
-  const handleFix = () => {
+  const handleFix = (option: FixOption = 'all') => {
     try {
       setError('')
-      // 尝试修复并显示修复后的结果
-      const fixed = preprocessJSON(input)
-      setInput(fixed)
-      // 尝试解析验证是否修复成功
-      JSON.parse(fixed)
-      setError('')
+      setFixLog([])
+      setShowFixMenu(false)
+      const logs: string[] = []
+      let text = input
+      const originalLength = text.length
+
+      const applyAll = option === 'all'
+
+      // 1. 移除 BOM 字符
+      if (applyAll || option === 'remove-bom') {
+        const bomRemoved = text.replace(/^\uFEFF/, '')
+        if (bomRemoved !== text) {
+          logs.push('✓ 移除了 BOM (Byte Order Mark) 字符')
+          text = bomRemoved
+        } else if (!applyAll) {
+          logs.push('ℹ️ 未检测到 BOM 字符')
+        }
+      }
+
+      // 2. 移除首尾空白
+      if (applyAll || option === 'trim-whitespace') {
+        const trimmed = text.trim()
+        if (trimmed !== text) {
+          logs.push('✓ 移除了首尾空白字符')
+          text = trimmed
+        } else if (!applyAll) {
+          logs.push('ℹ️ 无需移除首尾空白')
+        }
+      }
+
+      // 3. 检测裸露转义 JSON
+      if (applyAll || option === 'fix-escaped-json') {
+        if (text.match(/^[{[]\\"/)) {
+          logs.push('✓ 检测到裸露转义 JSON 格式（引号被转义但无外层包裹）')
+
+          // 移除转义 JSON 中间的非转义换行符
+          const beforeNewlineRemoval = text
+          text = text.replace(/([^\\])\n/g, '$1')
+          text = text.replace(/([^\\])\r\n/g, '$1')
+          text = text.replace(/([^\\])\r/g, '$1')
+
+          if (text !== beforeNewlineRemoval) {
+            const removedCount = (beforeNewlineRemoval.match(/\n|\r\n|\r/g) || []).length
+            logs.push(`✓ 移除了 ${removedCount} 个非法换行符`)
+          }
+
+          // 反转义处理
+          const BACKSLASH_PLACEHOLDER = '___BACKSLASH___'
+          let unescaped = text.replace(/\\\\/g, BACKSLASH_PLACEHOLDER)
+          unescaped = unescaped.replace(/\\"/g, '"')
+          unescaped = unescaped.replace(new RegExp(BACKSLASH_PLACEHOLDER, 'g'), '\\')
+
+          text = unescaped
+          logs.push('✓ 将转义的引号转换为正常引号')
+        } else if (!applyAll) {
+          logs.push('ℹ️ 未检测到裸露转义 JSON 格式')
+        }
+      }
+
+      // 4. 修复换行符导致的 JSON 错误
+      if (applyAll || option === 'fix-newlines') {
+        const beforeFix = text
+
+        // 移除键名中间的换行
+        text = text.replace(/"([^"]*)\n([^"]*)":/g, '"$1$2":')
+        const keyFixed = text !== beforeFix
+
+        // 移除字符串值中间的非转义换行
+        const beforeValueFix = text
+        text = text.replace(/:\s*"([^"]*)\n([^"]*)"/g, ': "$1$2"')
+        const valueFixed = text !== beforeValueFix
+
+        if (keyFixed) {
+          logs.push('✓ 修复了键名中的换行符')
+        }
+        if (valueFixed) {
+          logs.push('✓ 修复了字符串值中的换行符')
+        }
+        if (!keyFixed && !valueFixed && !applyAll) {
+          logs.push('ℹ️ 未检测到需要修复的换行符')
+        }
+      }
+
+      // 5. 标准化换行符（统一为 \n）
+      if (applyAll || option === 'normalize-newlines') {
+        const beforeNormalize = text
+        text = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n')
+        if (text !== beforeNormalize) {
+          logs.push('✓ 标准化换行符为 LF (\\n)')
+        } else if (!applyAll) {
+          logs.push('ℹ️ 换行符已是标准格式')
+        }
+      }
+
+      // 6. 移除多余的空白（保持结构）
+      if (applyAll || option === 'remove-empty-lines') {
+        const beforeWhitespace = text
+        text = text.replace(/\n\s*\n\s*\n/g, '\n\n') // 最多保留两个连续换行
+        if (text !== beforeWhitespace) {
+          logs.push('✓ 移除了多余的空行')
+        } else if (!applyAll) {
+          logs.push('ℹ️ 未检测到多余的空行')
+        }
+      }
+
+      // 验证修复结果
+      try {
+        JSON.parse(text)
+        logs.push('✅ JSON 格式验证通过！')
+
+        // 统计信息
+        const charReduced = originalLength - text.length
+        if (charReduced > 0) {
+          logs.push(`📊 总共减少了 ${charReduced} 个字符`)
+        } else if (charReduced < 0) {
+          logs.push(`📊 总共增加了 ${Math.abs(charReduced)} 个字符`)
+        } else if (logs.length === 1) {
+          // 只有验证通过，没有其他操作
+          logs.push('📊 字符数量未变化')
+        }
+
+        setInput(text)
+        setFixLog(logs)
+        setError('')
+      } catch (parseErr) {
+        logs.push(
+          `❌ 修复后仍无法解析: ${parseErr instanceof Error ? parseErr.message : '未知错误'}`
+        )
+        setFixLog(logs)
+        setError(`修复后仍有错误: ${parseErr instanceof Error ? parseErr.message : '未知错误'}`)
+      }
     } catch (err) {
-      setError(`修复后仍有错误: ${err instanceof Error ? err.message : '未知错误'}`)
+      setError(`修复过程出错: ${err instanceof Error ? err.message : '未知错误'}`)
+      setFixLog([])
     }
   }
 
@@ -331,6 +520,7 @@ export default function JsonFormatter() {
     }
     setInput(JSON.stringify(sample))
     setError('')
+    setFixLog([])
   }
 
   return (
@@ -362,12 +552,57 @@ export default function JsonFormatter() {
                 >
                   压缩
                 </button>
-                <button
-                  onClick={handleFix}
-                  className="rounded-md bg-yellow-500 px-4 py-2 text-white transition-colors hover:bg-yellow-600 dark:bg-yellow-600 dark:hover:bg-yellow-700"
-                >
-                  修复格式
-                </button>
+                {/* 修复格式按钮组 - 带下拉菜单 */}
+                <div className="fix-menu-container relative">
+                  <div className="flex">
+                    <button
+                      onClick={() => handleFix('all')}
+                      className="rounded-l-md bg-yellow-500 px-4 py-2 text-white transition-colors hover:bg-yellow-600 dark:bg-yellow-600 dark:hover:bg-yellow-700"
+                    >
+                      修复格式
+                    </button>
+                    <button
+                      onClick={() => setShowFixMenu(!showFixMenu)}
+                      className="rounded-r-md border-l border-yellow-400 bg-yellow-500 px-2 py-2 text-white transition-colors hover:bg-yellow-600 dark:border-yellow-500 dark:bg-yellow-600 dark:hover:bg-yellow-700"
+                      aria-label="修复选项"
+                    >
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        viewBox="0 0 20 20"
+                        fill="currentColor"
+                        className="h-5 w-5"
+                      >
+                        <path
+                          fillRule="evenodd"
+                          d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z"
+                          clipRule="evenodd"
+                        />
+                      </svg>
+                    </button>
+                  </div>
+
+                  {/* 下拉菜单 */}
+                  {showFixMenu && (
+                    <div className="absolute top-full left-0 z-10 mt-1 w-80 rounded-md border border-gray-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-800">
+                      <div className="py-1">
+                        {FIX_OPTIONS.map((opt) => (
+                          <button
+                            key={opt.value}
+                            onClick={() => handleFix(opt.value)}
+                            className="w-full px-4 py-2 text-left text-sm transition-colors hover:bg-gray-100 dark:hover:bg-gray-700"
+                          >
+                            <div className="font-medium text-gray-900 dark:text-gray-100">
+                              {opt.label}
+                            </div>
+                            <div className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+                              {opt.description}
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
                 <button
                   onClick={handleClear}
                   className="rounded-md bg-gray-500 px-4 py-2 text-white transition-colors hover:bg-gray-600 dark:bg-gray-600 dark:hover:bg-gray-700"
@@ -420,6 +655,41 @@ export default function JsonFormatter() {
                     </div>
                     <div className="ml-3">
                       <p className="text-sm text-red-700 dark:text-red-300">{error}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* 修复日志 */}
+              {fixLog.length > 0 && (
+                <div className="rounded-md bg-blue-50 p-4 dark:bg-blue-900/20">
+                  <div className="flex">
+                    <div className="flex-shrink-0">
+                      <svg
+                        className="h-5 w-5 text-blue-400"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                        />
+                      </svg>
+                    </div>
+                    <div className="ml-3 flex-1">
+                      <h3 className="text-sm font-medium text-blue-800 dark:text-blue-300">
+                        修复操作日志
+                      </h3>
+                      <div className="mt-2 space-y-1">
+                        {fixLog.map((log, index) => (
+                          <p key={index} className="text-sm text-blue-700 dark:text-blue-400">
+                            {log}
+                          </p>
+                        ))}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -505,7 +775,11 @@ export default function JsonFormatter() {
                   </li>
                   <li className="flex items-start">
                     <span className="mr-2">•</span>
-                    <span>调整缩进空格数，树形视图会实时响应</span>
+                    <span>智能修复换行符导致的格式问题</span>
+                  </li>
+                  <li className="flex items-start">
+                    <span className="mr-2">•</span>
+                    <span>修复操作会显示详细的处理日志</span>
                   </li>
                   <li className="flex items-start">
                     <span className="mr-2">•</span>
@@ -514,10 +788,6 @@ export default function JsonFormatter() {
                   <li className="flex items-start">
                     <span className="mr-2">•</span>
                     <span>可以复制单个键值对或整个对象/数组</span>
-                  </li>
-                  <li className="flex items-start">
-                    <span className="mr-2">•</span>
-                    <span>自动识别和修复裸露转义JSON格式</span>
                   </li>
                 </ul>
               </div>
