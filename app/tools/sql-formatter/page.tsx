@@ -9,27 +9,132 @@ type SQLDialect = 'mysql' | 'mongodb' | 'doris'
 // SQL 关键字定义
 const SQL_KEYWORDS = {
   mysql: [
-    'SELECT', 'FROM', 'WHERE', 'INSERT', 'INTO', 'VALUES', 'UPDATE', 'SET', 'DELETE',
-    'CREATE', 'TABLE', 'ALTER', 'DROP', 'INDEX', 'VIEW', 'DATABASE', 'SCHEMA',
-    'JOIN', 'INNER', 'LEFT', 'RIGHT', 'OUTER', 'FULL', 'CROSS', 'ON', 'USING',
-    'GROUP', 'BY', 'HAVING', 'ORDER', 'ASC', 'DESC', 'LIMIT', 'OFFSET',
-    'UNION', 'ALL', 'DISTINCT', 'AS', 'AND', 'OR', 'NOT', 'IN', 'EXISTS',
-    'BETWEEN', 'LIKE', 'IS', 'NULL', 'TRUE', 'FALSE',
-    'PRIMARY', 'KEY', 'FOREIGN', 'REFERENCES', 'CONSTRAINT', 'UNIQUE',
-    'AUTOINCREMENT', 'AUTO_INCREMENT', 'DEFAULT', 'CHECK',
-    'IF', 'CASE', 'WHEN', 'THEN', 'ELSE', 'END',
-    'BEGIN', 'COMMIT', 'ROLLBACK', 'TRANSACTION',
-    'INT', 'VARCHAR', 'TEXT', 'DATE', 'DATETIME', 'TIMESTAMP',
-    'BIGINT', 'SMALLINT', 'DECIMAL', 'FLOAT', 'DOUBLE', 'BOOLEAN',
+    'SELECT',
+    'FROM',
+    'WHERE',
+    'INSERT',
+    'INTO',
+    'VALUES',
+    'UPDATE',
+    'SET',
+    'DELETE',
+    'CREATE',
+    'TABLE',
+    'ALTER',
+    'DROP',
+    'INDEX',
+    'VIEW',
+    'DATABASE',
+    'SCHEMA',
+    'JOIN',
+    'INNER',
+    'LEFT',
+    'RIGHT',
+    'OUTER',
+    'FULL',
+    'CROSS',
+    'ON',
+    'USING',
+    'GROUP',
+    'BY',
+    'HAVING',
+    'ORDER',
+    'ASC',
+    'DESC',
+    'LIMIT',
+    'OFFSET',
+    'UNION',
+    'ALL',
+    'DISTINCT',
+    'AS',
+    'AND',
+    'OR',
+    'NOT',
+    'IN',
+    'EXISTS',
+    'BETWEEN',
+    'LIKE',
+    'IS',
+    'NULL',
+    'TRUE',
+    'FALSE',
+    'PRIMARY',
+    'KEY',
+    'FOREIGN',
+    'REFERENCES',
+    'CONSTRAINT',
+    'UNIQUE',
+    'AUTOINCREMENT',
+    'AUTO_INCREMENT',
+    'DEFAULT',
+    'CHECK',
+    'IF',
+    'CASE',
+    'WHEN',
+    'THEN',
+    'ELSE',
+    'END',
+    'BEGIN',
+    'COMMIT',
+    'ROLLBACK',
+    'TRANSACTION',
+    'INT',
+    'VARCHAR',
+    'TEXT',
+    'DATE',
+    'DATETIME',
+    'TIMESTAMP',
+    'BIGINT',
+    'SMALLINT',
+    'DECIMAL',
+    'FLOAT',
+    'DOUBLE',
+    'BOOLEAN',
   ],
   mongodb: [
-    'find', 'findOne', 'insertOne', 'insertMany', 'updateOne', 'updateMany',
-    'deleteOne', 'deleteMany', 'aggregate', 'count', 'distinct',
-    '$match', '$group', '$project', '$sort', '$limit', '$skip',
-    '$lookup', '$unwind', '$addFields', '$set', '$unset',
-    '$eq', '$ne', '$gt', '$gte', '$lt', '$lte', '$in', '$nin',
-    '$and', '$or', '$not', '$nor', '$exists', '$type',
-    '$sum', '$avg', '$min', '$max', '$push', '$first', '$last',
+    'find',
+    'findOne',
+    'insertOne',
+    'insertMany',
+    'updateOne',
+    'updateMany',
+    'deleteOne',
+    'deleteMany',
+    'aggregate',
+    'count',
+    'distinct',
+    '$match',
+    '$group',
+    '$project',
+    '$sort',
+    '$limit',
+    '$skip',
+    '$lookup',
+    '$unwind',
+    '$addFields',
+    '$set',
+    '$unset',
+    '$eq',
+    '$ne',
+    '$gt',
+    '$gte',
+    '$lt',
+    '$lte',
+    '$in',
+    '$nin',
+    '$and',
+    '$or',
+    '$not',
+    '$nor',
+    '$exists',
+    '$type',
+    '$sum',
+    '$avg',
+    '$min',
+    '$max',
+    '$push',
+    '$first',
+    '$last',
   ],
 }
 
@@ -50,7 +155,7 @@ export default function SqlFormatter() {
   const [inputHistory, setInputHistory] = useState<string[]>([])
   const [historyIndex, setHistoryIndex] = useState(-1)
   const inputRef = useRef<HTMLTextAreaElement>(null)
-  
+
   // 固定缩进为4个字符
   const indent = 4
   const linesBetweenQueries = 1
@@ -58,7 +163,7 @@ export default function SqlFormatter() {
   // 语法高亮函数
   const highlightSQL = (code: string, currentDialect: SQLDialect): React.ReactElement[] => {
     const lines = code.split('\n')
-    
+
     const highlightLine = (line: string, lineIndex: number): React.ReactElement => {
       // 保留空行（包括只有空格的行）
       if (!line.trim()) {
@@ -66,21 +171,38 @@ export default function SqlFormatter() {
       }
 
       const tokens: React.ReactElement[] = []
-      let currentIndex = 0
 
       if (currentDialect === 'mysql' || currentDialect === 'doris') {
         // SQL 关键字
         const keywords = SQL_KEYWORDS.mysql
-        const keywordPattern = new RegExp(
-          `\\b(${keywords.join('|')})\\b`,
-          'gi'
-        )
-        
+        const keywordPattern = new RegExp(`\\b(${keywords.join('|')})\\b`, 'gi')
+
         // 函数（常见的 SQL 函数）
         const functions = [
-          'COUNT', 'SUM', 'AVG', 'MAX', 'MIN', 'CONCAT', 'SUBSTRING', 'UPPER', 'LOWER',
-          'TRIM', 'LENGTH', 'ROUND', 'FLOOR', 'CEIL', 'NOW', 'CURDATE', 'DATE_FORMAT',
-          'IFNULL', 'COALESCE', 'CAST', 'CONVERT', 'YEAR', 'MONTH', 'DAY'
+          'COUNT',
+          'SUM',
+          'AVG',
+          'MAX',
+          'MIN',
+          'CONCAT',
+          'SUBSTRING',
+          'UPPER',
+          'LOWER',
+          'TRIM',
+          'LENGTH',
+          'ROUND',
+          'FLOOR',
+          'CEIL',
+          'NOW',
+          'CURDATE',
+          'DATE_FORMAT',
+          'IFNULL',
+          'COALESCE',
+          'CAST',
+          'CONVERT',
+          'YEAR',
+          'MONTH',
+          'DAY',
         ]
         const functionPattern = new RegExp(`\\b(${functions.join('|')})\\s*\\(`, 'gi')
 
@@ -90,35 +212,92 @@ export default function SqlFormatter() {
 
         // 收集所有匹配
         const allText = line
-        
+
+        // 匹配注释（优先级最高，避免注释内容被误识别）
+        // 单行注释 --
+        const dashCommentRegex = /--.*$/g
+        while ((match = dashCommentRegex.exec(allText)) !== null) {
+          matches.push({
+            start: match.index,
+            end: match.index + match[0].length,
+            type: 'comment',
+            text: match[0],
+          })
+        }
+
+        // 单行注释 #
+        const hashCommentRegex = /#.*$/g
+        while ((match = hashCommentRegex.exec(allText)) !== null) {
+          matches.push({
+            start: match.index,
+            end: match.index + match[0].length,
+            type: 'comment',
+            text: match[0],
+          })
+        }
+
+        // 多行注释 /* */
+        const multiCommentRegex = /\/\*[\s\S]*?\*\//g
+        while ((match = multiCommentRegex.exec(allText)) !== null) {
+          matches.push({
+            start: match.index,
+            end: match.index + match[0].length,
+            type: 'comment',
+            text: match[0],
+          })
+        }
+
         // 匹配字符串
         const stringRegex = /'([^'\\]|\\.)*'/g
         while ((match = stringRegex.exec(allText)) !== null) {
-          matches.push({ start: match.index, end: match.index + match[0].length, type: 'string', text: match[0] })
+          matches.push({
+            start: match.index,
+            end: match.index + match[0].length,
+            type: 'string',
+            text: match[0],
+          })
         }
 
         // 匹配数字
         const numberRegex = /\b\d+(\.\d+)?\b/g
         while ((match = numberRegex.exec(allText)) !== null) {
-          matches.push({ start: match.index, end: match.index + match[0].length, type: 'number', text: match[0] })
+          matches.push({
+            start: match.index,
+            end: match.index + match[0].length,
+            type: 'number',
+            text: match[0],
+          })
         }
 
         // 匹配函数
         while ((match = functionPattern.exec(allText)) !== null) {
           const funcName = match[1]
-          matches.push({ start: match.index, end: match.index + funcName.length, type: 'function', text: funcName })
+          matches.push({
+            start: match.index,
+            end: match.index + funcName.length,
+            type: 'function',
+            text: funcName,
+          })
         }
 
         // 匹配关键字
         while ((match = keywordPattern.exec(allText)) !== null) {
-          matches.push({ start: match.index, end: match.index + match[0].length, type: 'keyword', text: match[0] })
+          matches.push({
+            start: match.index,
+            end: match.index + match[0].length,
+            type: 'keyword',
+            text: match[0],
+          })
         }
 
         // 按位置排序并去重
         matches.sort((a, b) => a.start - b.start)
         const uniqueMatches: typeof matches = []
         for (const m of matches) {
-          if (uniqueMatches.length === 0 || m.start >= uniqueMatches[uniqueMatches.length - 1].end) {
+          if (
+            uniqueMatches.length === 0 ||
+            m.start >= uniqueMatches[uniqueMatches.length - 1].end
+          ) {
             uniqueMatches.push(m)
           }
         }
@@ -128,7 +307,9 @@ export default function SqlFormatter() {
         for (const m of uniqueMatches) {
           // 添加前面的普通文本
           if (m.start > lastIndex) {
-            tokens.push(<span key={`${lineIndex}-${tokenIndex++}`}>{line.substring(lastIndex, m.start)}</span>)
+            tokens.push(
+              <span key={`${lineIndex}-${tokenIndex++}`}>{line.substring(lastIndex, m.start)}</span>
+            )
           }
 
           // 添加高亮的文本
@@ -136,12 +317,14 @@ export default function SqlFormatter() {
             m.type === 'keyword'
               ? 'text-blue-600 dark:text-blue-400 font-semibold'
               : m.type === 'function'
-              ? 'text-purple-600 dark:text-purple-400 font-semibold'
-              : m.type === 'string'
-              ? 'text-green-600 dark:text-green-400'
-              : m.type === 'number'
-              ? 'text-orange-600 dark:text-orange-400'
-              : ''
+                ? 'text-purple-600 dark:text-purple-400 font-semibold'
+                : m.type === 'string'
+                  ? 'text-green-600 dark:text-green-400'
+                  : m.type === 'number'
+                    ? 'text-orange-600 dark:text-orange-400'
+                    : m.type === 'comment'
+                      ? 'text-gray-500 dark:text-gray-400 italic'
+                      : ''
 
           tokens.push(
             <span key={`${lineIndex}-${tokenIndex++}`} className={className}>
@@ -158,29 +341,59 @@ export default function SqlFormatter() {
         }
       } else if (currentDialect === 'mongodb') {
         // MongoDB 高亮
+
+        // 检查是否整行都是注释
+        const commentMatch = line.match(/^\s*(--|#|\/\*)/)
+        if (commentMatch) {
+          tokens.push(
+            <span key={`${lineIndex}-comment`} className="text-gray-500 italic dark:text-gray-400">
+              {line}
+            </span>
+          )
+          return <div key={lineIndex}>{tokens}</div>
+        }
+
         const mongoKeywords = SQL_KEYWORDS.mongodb
         const mongoPattern = new RegExp(`\\b(${mongoKeywords.join('|')})\\b`, 'g')
-        
+
         let match
         let lastIndex = 0
         let tokenIndex = 0
 
+        // 检查行末注释
+        let actualLine = line
+        let endComment = ''
+        const endCommentMatch = line.match(/(--|#).*$/)
+        if (endCommentMatch) {
+          actualLine = line.substring(0, endCommentMatch.index)
+          endComment = endCommentMatch[0]
+        }
+
         // 匹配字符串
         const stringRegex = /"([^"\\]|\\.)*"/g
         const stringMatches: Array<{ start: number; end: number }> = []
-        while ((match = stringRegex.exec(line)) !== null) {
+        while ((match = stringRegex.exec(actualLine)) !== null) {
           stringMatches.push({ start: match.index, end: match.index + match[0].length })
         }
 
         // 匹配关键字/操作符（不在字符串内）
-        while ((match = mongoPattern.exec(line)) !== null) {
-          const isInString = stringMatches.some(s => match.index >= s.start && match.index < s.end)
+        while ((match = mongoPattern.exec(actualLine)) !== null) {
+          const isInString = stringMatches.some(
+            (s) => match.index >= s.start && match.index < s.end
+          )
           if (!isInString) {
             if (match.index > lastIndex) {
-              tokens.push(<span key={`${lineIndex}-${tokenIndex++}`}>{line.substring(lastIndex, match.index)}</span>)
+              tokens.push(
+                <span key={`${lineIndex}-${tokenIndex++}`}>
+                  {actualLine.substring(lastIndex, match.index)}
+                </span>
+              )
             }
             tokens.push(
-              <span key={`${lineIndex}-${tokenIndex++}`} className="text-purple-600 dark:text-purple-400 font-semibold">
+              <span
+                key={`${lineIndex}-${tokenIndex++}`}
+                className="font-semibold text-purple-600 dark:text-purple-400"
+              >
                 {match[0]}
               </span>
             )
@@ -192,27 +405,43 @@ export default function SqlFormatter() {
         lastIndex = 0
         tokenIndex = 0
         const result: React.ReactElement[] = []
-        
+
         for (const strMatch of stringMatches) {
           if (strMatch.start > lastIndex) {
-            const between = line.substring(lastIndex, strMatch.start)
+            const between = actualLine.substring(lastIndex, strMatch.start)
             // 在非字符串部分应用关键字高亮
             const highlighted = highlightMongoKeywords(between, tokenIndex)
             result.push(...highlighted.tokens)
             tokenIndex = highlighted.nextIndex
           }
           result.push(
-            <span key={`${lineIndex}-${tokenIndex++}`} className="text-green-600 dark:text-green-400">
-              {line.substring(strMatch.start, strMatch.end)}
+            <span
+              key={`${lineIndex}-${tokenIndex++}`}
+              className="text-green-600 dark:text-green-400"
+            >
+              {actualLine.substring(strMatch.start, strMatch.end)}
             </span>
           )
           lastIndex = strMatch.end
         }
 
-        if (lastIndex < line.length) {
-          const rest = line.substring(lastIndex)
+        if (lastIndex < actualLine.length) {
+          const rest = actualLine.substring(lastIndex)
           const highlighted = highlightMongoKeywords(rest, tokenIndex)
           result.push(...highlighted.tokens)
+          tokenIndex = highlighted.nextIndex
+        }
+
+        // 添加行末注释
+        if (endComment) {
+          result.push(
+            <span
+              key={`${lineIndex}-${tokenIndex++}`}
+              className="text-gray-500 italic dark:text-gray-400"
+            >
+              {' ' + endComment}
+            </span>
+          )
         }
 
         return <div key={lineIndex}>{result.length > 0 ? result : line}</div>
@@ -221,21 +450,29 @@ export default function SqlFormatter() {
       return <div key={lineIndex}>{tokens.length > 0 ? tokens : line}</div>
     }
 
-    const highlightMongoKeywords = (text: string, startIndex: number): { tokens: React.ReactElement[]; nextIndex: number } => {
+    const highlightMongoKeywords = (
+      text: string,
+      startIndex: number
+    ): { tokens: React.ReactElement[]; nextIndex: number } => {
       const tokens: React.ReactElement[] = []
       const mongoKeywords = SQL_KEYWORDS.mongodb
       const pattern = new RegExp(`\\b(${mongoKeywords.join('|')})\\b`, 'g')
-      
+
       let match
       let lastIndex = 0
       let tokenIndex = startIndex
 
       while ((match = pattern.exec(text)) !== null) {
         if (match.index > lastIndex) {
-          tokens.push(<span key={`tok-${tokenIndex++}`}>{text.substring(lastIndex, match.index)}</span>)
+          tokens.push(
+            <span key={`tok-${tokenIndex++}`}>{text.substring(lastIndex, match.index)}</span>
+          )
         }
         tokens.push(
-          <span key={`tok-${tokenIndex++}`} className="text-purple-600 dark:text-purple-400 font-semibold">
+          <span
+            key={`tok-${tokenIndex++}`}
+            className="font-semibold text-purple-600 dark:text-purple-400"
+          >
             {match[0]}
           </span>
         )
@@ -284,6 +521,7 @@ export default function SqlFormatter() {
         setOutput('')
       }
     },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [historyIndex, indent, uppercase, linesBetweenQueries]
   )
 
@@ -327,32 +565,109 @@ export default function SqlFormatter() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [uppercase, dialect])
 
+  // 辅助函数：提取并保存注释
+  const extractComments = (
+    sql: string
+  ): { sql: string; comments: Map<string, string>; lineComments: Map<number, string[]> } => {
+    const comments = new Map<string, string>()
+    const lineComments = new Map<number, string[]>()
+    let result = sql
+    let commentIndex = 0
+
+    // 提取多行注释 /* ... */
+    result = result.replace(/\/\*[\s\S]*?\*\//g, (match) => {
+      const placeholder = `__COMMENT_${commentIndex}__`
+      comments.set(placeholder, match)
+      commentIndex++
+      return placeholder
+    })
+
+    // 按行处理单行注释
+    const lines = result.split('\n')
+    const processedLines = lines.map((line, lineIndex) => {
+      // 提取 -- 注释（SQL 标准）
+      const dashCommentMatch = line.match(/--.*$/)
+      if (dashCommentMatch) {
+        const commentText = dashCommentMatch[0]
+        if (!lineComments.has(lineIndex)) {
+          lineComments.set(lineIndex, [])
+        }
+        lineComments.get(lineIndex)!.push(commentText)
+        return line.substring(0, dashCommentMatch.index)
+      }
+
+      // 提取 # 注释（MySQL）
+      const hashCommentMatch = line.match(/#.*$/)
+      if (hashCommentMatch) {
+        const commentText = hashCommentMatch[0]
+        if (!lineComments.has(lineIndex)) {
+          lineComments.set(lineIndex, [])
+        }
+        lineComments.get(lineIndex)!.push(commentText)
+        return line.substring(0, hashCommentMatch.index)
+      }
+
+      return line
+    })
+
+    return { sql: processedLines.join('\n'), comments, lineComments }
+  }
+
+  // 辅助函数：恢复注释
+  const restoreComments = (
+    sql: string,
+    comments: Map<string, string>,
+    lineComments: Map<number, string[]>
+  ): string => {
+    let result = sql
+
+    // 恢复多行注释占位符
+    comments.forEach((comment, placeholder) => {
+      result = result.replace(placeholder, comment)
+    })
+
+    // 恢复单行注释
+    const lines = result.split('\n')
+    const restoredLines = lines.map((line, index) => {
+      if (lineComments.has(index)) {
+        const comments = lineComments.get(index)!
+        return line.trimEnd() + ' ' + comments.join(' ')
+      }
+      return line
+    })
+
+    return restoredLines.join('\n')
+  }
+
   // SQL 格式化核心函数
   const formatSQL = (sql: string, options: FormatOptions): string => {
     if (!sql.trim()) return ''
 
-    let formatted = sql.trim()
+    const formatted = sql.trim()
 
     // MongoDB 特殊处理
     if (dialect === 'mongodb') {
       return formatMongoDB(formatted, options)
     }
 
+    // 提取注释
+    const { sql: sqlWithoutComments, comments, lineComments } = extractComments(formatted)
+
     // SQL 格式化 (MySQL, Doris)
     const indentStr = ' '.repeat(options.indent)
     const keywords = SQL_KEYWORDS.mysql
 
     // 分割多个SQL语句（以分号分隔）
-    const statements = formatted.split(';').filter((s) => s.trim())
+    const statements = sqlWithoutComments.split(';').filter((s) => s.trim())
 
     const formattedStatements = statements.map((statement) => {
       let result = statement.trim()
 
-      // 移除多余的空白
+      // 移除多余的空白（但保留注释占位符周围的空格）
       result = result.replace(/\s+/g, ' ')
 
       // 关键字大小写处理
-      const keywordCase = (keyword: string) => 
+      const keywordCase = (keyword: string) =>
         options.uppercase ? keyword.toUpperCase() : keyword.toLowerCase()
 
       // 先处理所有关键字的大小写
@@ -393,7 +708,10 @@ export default function SqlFormatter() {
 
     // 用分号和换行连接多个语句
     const separator = ';\n' + '\n'.repeat(options.linesBetweenQueries)
-    return formattedStatements.join(separator) + ';'
+    const finalResult = formattedStatements.join(separator) + ';'
+
+    // 恢复注释
+    return restoreComments(finalResult, comments, lineComments)
   }
 
   // 格式化 SELECT 语句
@@ -417,7 +735,10 @@ export default function SqlFormatter() {
         .map((col) => indentStr + col.trim())
         .join(',\n')
 
-      result = result.replace(selectMatch[0], `${selectKeyword}\n${formattedColumns}\n${fromKeyword} `)
+      result = result.replace(
+        selectMatch[0],
+        `${selectKeyword}\n${formattedColumns}\n${fromKeyword} `
+      )
     }
 
     // 处理 FROM 子句（表和JOIN）
@@ -432,9 +753,12 @@ export default function SqlFormatter() {
     })
 
     // 处理 WHERE 中的 AND/OR
-    result = result.replace(/(WHERE\s+[\s\S]*?)(\s+)(AND|OR)(\s+)/gi, (match, before, ws1, andor, ws2) => {
-      return `${before}\n${indentStr}${keywordCase(andor)}${ws2}`
-    })
+    result = result.replace(
+      /(WHERE\s+[\s\S]*?)(\s+)(AND|OR)(\s+)/gi,
+      (match, before, ws1, andor, ws2) => {
+        return `${before}\n${indentStr}${keywordCase(andor)}${ws2}`
+      }
+    )
 
     // 处理 GROUP BY
     result = result.replace(/(\s+)(GROUP\s+BY)(\s+)/gi, (match, before, groupby, after) => {
@@ -513,16 +837,13 @@ export default function SqlFormatter() {
     })
 
     // 处理 SET 后的赋值列表
-    result = result.replace(
-      /SET\s+([\s\S]*?)(\s+WHERE|$)/i,
-      (match, sets, rest) => {
-        const setList = sets
-          .split(',')
-          .map((s: string) => indentStr + s.trim())
-          .join(',\n')
-        return `${keywordCase('SET')}\n${setList}${rest}`
-      }
-    )
+    result = result.replace(/SET\s+([\s\S]*?)(\s+WHERE|$)/i, (match, sets, rest) => {
+      const setList = sets
+        .split(',')
+        .map((s: string) => indentStr + s.trim())
+        .join(',\n')
+      return `${keywordCase('SET')}\n${setList}${rest}`
+    })
 
     // 处理 WHERE
     result = result.replace(/(\s+)(WHERE)(\s+)/gi, (match, before, where, after) => {
@@ -551,9 +872,12 @@ export default function SqlFormatter() {
     })
 
     // 处理 WHERE 中的 AND/OR
-    result = result.replace(/(WHERE\s+[\s\S]*?)(\s+)(AND|OR)(\s+)/gi, (match, before, ws1, andor, ws2) => {
-      return `${before}\n${indentStr}${keywordCase(andor)}${ws2}`
-    })
+    result = result.replace(
+      /(WHERE\s+[\s\S]*?)(\s+)(AND|OR)(\s+)/gi,
+      (match, before, ws1, andor, ws2) => {
+        return `${before}\n${indentStr}${keywordCase(andor)}${ws2}`
+      }
+    )
 
     return result
   }
@@ -597,14 +921,17 @@ export default function SqlFormatter() {
       const jsObjectToJSON = (jsStr: string): string => {
         // 给没有引号的属性名添加引号
         let result = jsStr
-        
+
         // 处理对象属性名：word: -> "word":
         // 匹配 { 或 , 后面跟着空格，然后是标识符（不含引号），然后是冒号
-        result = result.replace(/([{,]\s*)([a-zA-Z_$][a-zA-Z0-9_$]*)(\s*):/g, (match, prefix, key, space) => {
-          // 确保前面的字符不是引号
-          return `${prefix}"${key}"${space}:`
-        })
-        
+        result = result.replace(
+          /([{,]\s*)([a-zA-Z_$][a-zA-Z0-9_$]*)(\s*):/g,
+          (match, prefix, key, space) => {
+            // 确保前面的字符不是引号
+            return `${prefix}"${key}"${space}:`
+          }
+        )
+
         return result
       }
 
@@ -613,11 +940,11 @@ export default function SqlFormatter() {
         try {
           // 移除所有换行和多余空白，确保是紧凑格式
           const compactStr = jsonStr.replace(/\s+/g, ' ').trim()
-          
+
           // 先转换为有效的 JSON
           const validJSON = jsObjectToJSON(compactStr)
           const parsed = JSON.parse(validJSON)
-          
+
           // 使用4个空格缩进格式化 JSON
           const formatted = JSON.stringify(parsed, null, 4)
           return formatted
@@ -647,69 +974,69 @@ export default function SqlFormatter() {
       const findMatchingParen = (str: string, start: number): number => {
         let depth = 1
         let i = start
-        
+
         while (i < str.length && depth > 0) {
           if (str[i] === '"') {
             i = skipString(str, i)
             continue
           }
-          
+
           if (str[i] === '(' || str[i] === '[' || str[i] === '{') {
             depth++
           } else if (str[i] === ')' || str[i] === ']' || str[i] === '}') {
             depth--
           }
-          
+
           i++
         }
-        
+
         return i - 1 // 返回右括号的位置
       }
 
       // 手动解析并格式化方法链式调用
       let result = ''
       let i = 0
-      
+
       while (i < query.length) {
         // 查找标识符（方法名、变量名等）
         const identMatch = query.substring(i).match(/^([a-zA-Z_$][a-zA-Z0-9_$]*)/)
-        
+
         if (identMatch) {
           const ident = identMatch[0]
           result += ident
           i += ident.length
-          
+
           // 跳过空格
           while (i < query.length && /\s/.test(query[i])) {
             i++
           }
-          
+
           // 检查是否是方法调用（有括号）
           if (i < query.length && query[i] === '(') {
             result += '('
             i++
-            
+
             // 找到匹配的右括号
             const closeParen = findMatchingParen(query, i)
-            
+
             // 提取参数
             const args = query.substring(i, closeParen).trim()
-            
+
             // 如果参数是 JSON 对象或数组，格式化它
             if (args && (args.startsWith('{') || args.startsWith('['))) {
               result += formatJSON(args)
             } else if (args) {
               result += args
             }
-            
+
             result += ')'
             i = closeParen + 1
-            
+
             // 跳过空格
             while (i < query.length && /\s/.test(query[i])) {
               i++
             }
-            
+
             // 检查是否有链式调用
             if (i < query.length && query[i] === '.') {
               // 检查下一个是否是方法调用（.method(）而不仅仅是属性访问（.property）
@@ -797,9 +1124,14 @@ export default function SqlFormatter() {
 
   const handleSample = () => {
     const samples: Record<SQLDialect, string> = {
-      mysql: `SELECT u.id, u.name, u.email, o.order_id, o.total_amount FROM users u LEFT JOIN orders o ON u.id = o.user_id WHERE u.status = 'active' AND o.created_at >= '2024-01-01' GROUP BY u.id, u.name ORDER BY o.total_amount DESC LIMIT 10;`,
-      mongodb: `db.users.find({ status: "active", age: { $gte: 18, $lte: 65 }, tags: { $in: ["developer", "engineer"] } }).sort({ created_at: -1, name: 1 }).limit(10)`,
-      doris: `SELECT u.id, u.name, COUNT(o.order_id) as order_count, SUM(o.amount) as total_amount FROM users u LEFT JOIN orders o ON u.id = o.user_id WHERE u.created_at >= '2024-01-01' GROUP BY u.id, u.name ORDER BY total_amount DESC LIMIT 100;`,
+      mysql: `-- 查询活跃用户及其订单信息
+SELECT u.id, u.name, u.email, /* 用户基本信息 */ o.order_id, o.total_amount FROM users u LEFT JOIN orders o ON u.id = o.user_id WHERE u.status = 'active' AND o.created_at >= '2024-01-01' -- 只查询2024年的订单
+GROUP BY u.id, u.name ORDER BY o.total_amount DESC LIMIT 10;`,
+      mongodb: `// 查询符合条件的开发者用户
+db.users.find({ status: "active", age: { $gte: 18, $lte: 65 }, tags: { $in: ["developer", "engineer"] } }).sort({ created_at: -1, name: 1 }).limit(10)`,
+      doris: `-- Doris 查询示例
+# 统计用户订单数量和总金额
+SELECT u.id, u.name, COUNT(o.order_id) as order_count, /* 订单数量 */ SUM(o.amount) as total_amount FROM users u LEFT JOIN orders o ON u.id = o.user_id WHERE u.created_at >= '2024-01-01' GROUP BY u.id, u.name ORDER BY total_amount DESC LIMIT 100;`,
     }
     updateInput(samples[dialect])
   }
@@ -882,7 +1214,7 @@ export default function SqlFormatter() {
                       id="uppercase"
                       checked={uppercase}
                       onChange={(e) => setUppercase(e.target.checked)}
-                      className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                      className="text-primary-600 focus:ring-primary-500 h-4 w-4 rounded border-gray-300"
                     />
                   </div>
                 )}
@@ -1010,6 +1342,10 @@ export default function SqlFormatter() {
                   </li>
                   <li className="flex items-start">
                     <span className="mr-2">•</span>
+                    <span>支持 SQL 注释（-- 和 # 单行注释，/* */ 多行注释）</span>
+                  </li>
+                  <li className="flex items-start">
+                    <span className="mr-2">•</span>
                     <span>固定使用4个空格缩进，格式统一</span>
                   </li>
                   <li className="flex items-start">
@@ -1050,4 +1386,3 @@ export default function SqlFormatter() {
     </div>
   )
 }
-
