@@ -15,22 +15,22 @@ const toolsData: ToolGroup[] = [
     category: '网页工具',
     tools: [
       {
-        title: 'Json',
-        description: 'json格式化',
+        title: 'JSON格式化',
+        description: 'JSON 格式化、压缩、验证工具',
         href: '/tools/json-formatter',
-        icon: '/static/favicons/tools_icon/json.ico',
+        icon: '/static/favicons/tools_icon/json.svg',
+      },
+      {
+        title: 'SQL格式化',
+        description: '支持 MySQL、MongoDB、Doris 等多种数据库语法',
+        href: '/tools/sql-formatter',
+        icon: '/static/favicons/tools_icon/sql.svg',
       },
       {
         title: 'IP地址查询',
         description: '致力于普及 IPv6 ,推进 IPv6 规模部署和应用',
         href: 'https://ipw.cn/',
         icon: '/static/favicons/tools_icon/ipw.ico',
-      },
-      {
-        title: 'SQL美化',
-        description: 'SQL 格式化|压缩一体',
-        href: 'https://www.sojson.com/sql.html',
-        icon: '/static/favicons/tools_icon/sojson.ico',
       },
     ],
   },
