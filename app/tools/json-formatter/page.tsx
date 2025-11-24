@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useEffect, useCallback } from 'react'
+import { useState, useRef, useEffect, useCallback, memo } from 'react'
 import { genPageMetadata } from 'app/seo'
 
 // 修复选项类型
@@ -44,16 +44,64 @@ const FIX_OPTIONS: { value: FixOption; label: string; description: string }[] = 
   },
 ]
 
-// JSON 节点组件 - 用于递归显示 JSON 树
+// 高亮文本组件
+interface HighlightTextProps {
+  text: string
+  searchQuery: string
+}
+
+const HighlightText = memo(function HighlightText({ text, searchQuery }: HighlightTextProps) {
+  if (!searchQuery) {
+    return <span>{text}</span>
+  }
+
+  const lowerText = text.toLowerCase()
+  const lowerQuery = searchQuery.toLowerCase()
+  const matches: { start: number; end: number }[] = []
+
+  let index = 0
+  while ((index = lowerText.indexOf(lowerQuery, index)) !== -1) {
+    matches.push({ start: index, end: index + searchQuery.length })
+    index += 1
+  }
+
+  if (matches.length === 0) {
+    return <span>{text}</span>
+  }
+
+  const parts: React.ReactNode[] = []
+  let lastIndex = 0
+
+  matches.forEach((match, i) => {
+    parts.push(text.substring(lastIndex, match.start))
+
+    parts.push(
+      <mark
+        key={`match-${i}`}
+        className="bg-yellow-300 dark:bg-yellow-600 text-gray-900 dark:text-gray-100"
+      >
+        {text.substring(match.start, match.end)}
+      </mark>
+    )
+    lastIndex = match.end
+  })
+
+  parts.push(text.substring(lastIndex))
+  return <span>{parts}</span>
+})
+
+// JSON 节点组件 - 用于递归显示 JSON 树 (使用 memo 优化)
 interface JsonNodeProps {
   data: unknown
   keyName?: string
   level?: number
   indent?: number
   onCopySuccess?: () => void
+  searchQuery?: string
+  searchIndex?: number
 }
 
-function JsonNode({ data, keyName, level = 0, indent = 2, onCopySuccess }: JsonNodeProps) {
+const JsonNode = memo(function JsonNode({ data, keyName, level = 0, indent = 2, onCopySuccess, searchQuery = '', searchIndex = -1 }: JsonNodeProps) {
   const [collapsed, setCollapsed] = useState(false)
   const [showCopy, setShowCopy] = useState(false)
   const isObject = typeof data === 'object' && data !== null && !Array.isArray(data)
@@ -111,11 +159,19 @@ function JsonNode({ data, keyName, level = 0, indent = 2, onCopySuccess }: JsonN
         <div className="flex items-center">
           <div className="flex-1">
             {keyName && (
-              <span className="font-medium text-red-600 dark:text-red-400">"{keyName}"</span>
+              <span className="font-medium text-red-600 dark:text-red-400">
+                <HighlightText text={`"${keyName}"`} searchQuery={searchQuery} />
+              </span>
             )}
             {keyName && <span className="text-gray-500 dark:text-gray-400">: </span>}
             <span className={valueColor}>
-              {typeof data === 'string' ? `"${data}"` : data === null ? 'null' : String(data)}
+              {typeof data === 'string' ? (
+                <HighlightText text={`"${data}"`} searchQuery={searchQuery} />
+              ) : data === null ? (
+                <HighlightText text="null" searchQuery={searchQuery} />
+              ) : (
+                <HighlightText text={String(data)} searchQuery={searchQuery} />
+              )}
             </span>
             {level > 0 && <span className="text-gray-400 dark:text-gray-500">,</span>}
           </div>
@@ -151,7 +207,9 @@ function JsonNode({ data, keyName, level = 0, indent = 2, onCopySuccess }: JsonN
           <div className="flex-1">
             {keyName && (
               <>
-                <span className="font-medium text-red-600 dark:text-red-400">"{keyName}"</span>
+                <span className="font-medium text-red-600 dark:text-red-400">
+                  <HighlightText text={`"${keyName}"`} searchQuery={searchQuery} />
+                </span>
                 <span className="text-gray-500 dark:text-gray-400">: </span>
               </>
             )}
@@ -163,22 +221,17 @@ function JsonNode({ data, keyName, level = 0, indent = 2, onCopySuccess }: JsonN
               <span className="mr-1 text-xs text-gray-400 select-none dark:text-gray-500">
                 {collapsed ? '▶' : '▼'}
               </span>
-              <span className="font-bold text-gray-700 dark:text-gray-300">{openBracket}</span>
+              <span className="font-bold text-gray-700 dark:text-gray-300">
+                <HighlightText text={openBracket} searchQuery={searchQuery} />
+              </span>
             </button>
             {collapsed && (
               <>
                 <span className="ml-2 text-xs text-gray-400 italic dark:text-gray-500">
-                  {itemCount}{' '}
-                  {isArray
-                    ? itemCount === 1
-                      ? 'item'
-                      : 'items'
-                    : itemCount === 1
-                      ? 'key'
-                      : 'keys'}
+                  <HighlightText text={`${itemCount} ${isArray ? (itemCount === 1 ? 'item' : 'items') : (itemCount === 1 ? 'key' : 'keys')}`} searchQuery={searchQuery} />
                 </span>
                 <span className="ml-1 font-bold text-gray-700 dark:text-gray-300">
-                  {closeBracket}
+                  <HighlightText text={closeBracket} searchQuery={searchQuery} />
                 </span>
                 {level > 0 && <span className="text-gray-400 dark:text-gray-500">,</span>}
               </>
@@ -205,6 +258,8 @@ function JsonNode({ data, keyName, level = 0, indent = 2, onCopySuccess }: JsonN
                   level={level + 1}
                   indent={indent}
                   onCopySuccess={onCopySuccess}
+                  searchQuery={searchQuery}
+                  searchIndex={searchIndex}
                 />
               ))
             : entries.map(([key, value]: [string, unknown]) => (
@@ -215,6 +270,8 @@ function JsonNode({ data, keyName, level = 0, indent = 2, onCopySuccess }: JsonN
                   level={level + 1}
                   indent={indent}
                   onCopySuccess={onCopySuccess}
+                  searchQuery={searchQuery}
+                  searchIndex={searchIndex}
                 />
               ))}
           <div
@@ -228,7 +285,7 @@ function JsonNode({ data, keyName, level = 0, indent = 2, onCopySuccess }: JsonN
       )}
     </div>
   )
-}
+})
 
 export default function JsonFormatter() {
   const [input, setInput] = useState('')
@@ -239,60 +296,78 @@ export default function JsonFormatter() {
   const [showToast, setShowToast] = useState(false)
   const [fixLog, setFixLog] = useState<string[]>([])
   const [showFixMenu, setShowFixMenu] = useState(false)
-  const [isCompressed, setIsCompressed] = useState(false) // 是否为压缩模式
-  const [inputHistory, setInputHistory] = useState<string[]>([]) // 历史记录
-  const [historyIndex, setHistoryIndex] = useState(-1) // 当前历史索引
+  const [isCompressed, setIsCompressed] = useState(false)
+  const [inputHistory, setInputHistory] = useState<string[]>([])
+  const [historyIndex, setHistoryIndex] = useState(-1)
+  const [showOutputSearch, setShowOutputSearch] = useState(false)
+  const [outputSearchQuery, setOutputSearchQuery] = useState('')
+  const [outputSearchIndex, setOutputSearchIndex] = useState(-1)
+  const [isProcessing, setIsProcessing] = useState(false) // 处理中状态
+  const [processProgress, setProcessProgress] = useState(0) // 处理进度 0-100
+  const [isOutputSelected, setIsOutputSelected] = useState(false) // 输出框是否被选中
   const inputRef = useRef<HTMLTextAreaElement>(null)
+  const outputRef = useRef<HTMLDivElement>(null)
+  const outputContentRef = useRef<HTMLDivElement>(null) // 输出框内容区域（可滚动）
+  const inputSearchRef = useRef<HTMLInputElement>(null)
+  const outputSearchRef = useRef<HTMLInputElement>(null)
+  const inputContainerRef = useRef<HTMLDivElement>(null)
+  const outputContainerRef = useRef<HTMLDivElement>(null)
 
-  // 带历史记录的输入更新
-  const updateInput = useCallback(
-    (value: string) => {
-      setInput(value)
-      setError('') // 输入时清除错误
+  // 带历史记录的输入更新 - 自动格式化
+  const updateInput = useCallback((value: string) => {
+    setInput(value)
+    setError('')
+    setIsProcessing(true)
+    setProcessProgress(0)
 
-      // 添加历史记录（最多保存10次）
-      setInputHistory((prev) => {
-        // 如果当前不在历史的最后位置，删除后面的历史
-        const newHistory = historyIndex >= 0 ? prev.slice(0, historyIndex + 1) : prev
-        // 添加新记录并限制在10条以内
-        const updated = [...newHistory, value].slice(-10)
-        // 更新索引
-        setHistoryIndex(updated.length - 1)
-        return updated
-      })
+    // 添加历史记录
+    setInputHistory((prev) => {
+      const newHistory = historyIndex >= 0 ? prev.slice(0, historyIndex + 1) : prev
+      const updated = [...newHistory, value].slice(-10)
+      setHistoryIndex(updated.length - 1)
+      return updated
+    })
 
-      // 自动尝试格式化（静默，不显示错误）
+    // 立即执行格式化
+    try {
       if (value.trim()) {
-        try {
-          // 预处理输入
-          const processedText = preprocessJSON(value)
-          let parsed = JSON.parse(processedText)
+        setProcessProgress(25)
+        const processedText = preprocessJSON(value)
+        setProcessProgress(50)
+        
+        let parsed = JSON.parse(processedText)
+        setProcessProgress(65)
 
-          // 如果解析结果是字符串，尝试再次解析（处理转义的 JSON）
-          if (typeof parsed === 'string') {
-            try {
-              parsed = JSON.parse(preprocessJSON(parsed))
-            } catch {
-              // 第二次解析失败，使用第一次的结果
-            }
+        if (typeof parsed === 'string') {
+          try {
+            parsed = JSON.parse(preprocessJSON(parsed))
+          } catch {
+            // 忽略第二次解析失败
           }
-
-          const formatted = JSON.stringify(parsed, null, indent)
-          setOutput(formatted)
-          setParsedJson(parsed)
-          setIsCompressed(false)
-        } catch {
-          // 输入时解析失败不显示错误，保持之前的输出
         }
+
+        setProcessProgress(80)
+        const formatted = JSON.stringify(parsed, null, indent)
+        setProcessProgress(95)
+        
+        setOutput(formatted)
+        setParsedJson(parsed)
+        setIsCompressed(false)
       } else {
-        // 清空输入时也清空输出
         setOutput('')
         setParsedJson(null)
         setIsCompressed(false)
       }
-    },
-    [historyIndex, indent]
-  )
+    } catch {
+      // 解析失败不显示错误
+    } finally {
+      setProcessProgress(100)
+      setTimeout(() => {
+        setIsProcessing(false)
+        setProcessProgress(0)
+      }, 300)
+    }
+  }, [historyIndex, indent])
 
   // 撤销操作（Ctrl+Z）
   const handleUndo = useCallback(() => {
@@ -304,11 +379,73 @@ export default function JsonFormatter() {
     }
   }, [historyIndex, inputHistory])
 
+  // 当输入改变时，将光标移到末尾
+  useEffect(() => {
+    if (inputRef.current) {
+      inputRef.current.selectionStart = input.length
+      inputRef.current.selectionEnd = input.length
+    }
+  }, [input])
+
   // 显示复制成功的浮窗提示
   const showCopyToast = () => {
     setShowToast(true)
     setTimeout(() => setShowToast(false), 2000)
   }
+
+  // 计算匹配位置（带去抖）
+  const calculateMatches = (text: string, query: string): number[] => {
+    if (!query.trim() || text.length === 0) return []
+    const matches: number[] = []
+    const lowerText = text.toLowerCase()
+    const lowerQuery = query.toLowerCase()
+    let index = 0
+    while ((index = lowerText.indexOf(lowerQuery, index)) !== -1) {
+      matches.push(index)
+      index += 1 // 每次往前推1个位置，支持重叠匹配
+    }
+    return matches
+  }
+
+  // 处理输出框搜索
+  const handleOutputSearch = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      const matches = calculateMatches(output, outputSearchQuery)
+      if (matches.length > 0) {
+        setOutputSearchIndex((prev) => {
+          const nextIndex = prev < 0 ? 0 : (prev + 1) % matches.length
+          return nextIndex
+        })
+      }
+    }
+  }
+
+  // 处理 Ctrl+F 快捷键
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+        // 当输出框被选中或搜索框已打开时，阻止默认行为
+        if (isOutputSelected || showOutputSearch) {
+          e.preventDefault()
+          setShowOutputSearch(true)
+          setTimeout(() => outputSearchRef.current?.focus(), 0)
+        }
+        // 其他地方允许浏览器默认搜索
+      }
+
+      // Escape 关闭搜索框
+      if (e.key === 'Escape') {
+        if (showOutputSearch) {
+          setShowOutputSearch(false)
+          setOutputSearchQuery('')
+          setOutputSearchIndex(-1)
+        }
+      }
+    }
+
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [showOutputSearch, isOutputSelected])
 
   // 监听键盘事件 (Ctrl+Z)
   useEffect(() => {
@@ -324,8 +461,26 @@ export default function JsonFormatter() {
     }
 
     document.addEventListener('keydown', handleKeyDown)
-    return () => document.removeEventListener('keydown', handleKeyDown)
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown)
+    }
   }, [handleUndo])
+
+  // 处理输出框选中状态：点击输出框时选中，点击其他地方时取消选中
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (isOutputSelected) {
+        const target = event.target as HTMLElement
+        // 检查点击是否在输出框容器外部
+        if (outputContainerRef.current && !outputContainerRef.current.contains(target)) {
+          setIsOutputSelected(false)
+        }
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [isOutputSelected])
 
   // 点击外部关闭修复菜单
   useEffect(() => {
@@ -343,6 +498,47 @@ export default function JsonFormatter() {
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [showFixMenu])
+
+  // 搜索结果自动滚动到视图中
+  useEffect(() => {
+    if (outputSearchIndex >= 0 && outputSearchQuery && outputContentRef.current) {
+      // 使用 setTimeout 确保 DOM 更新完成
+      const timer = setTimeout(() => {
+        const container = outputContentRef.current!
+        const allMarks = container.querySelectorAll('mark') as NodeListOf<HTMLElement>
+
+        if (allMarks && allMarks.length > outputSearchIndex) {
+          const currentMatch = allMarks[outputSearchIndex]
+
+          if (currentMatch) {
+            // 使用 scrollIntoView 让元素居中显示
+            currentMatch.scrollIntoView({
+              behavior: 'smooth',
+              block: 'center',
+              inline: 'nearest'
+            })
+          }
+        }
+      }, 100)
+
+      return () => clearTimeout(timer)
+    }
+  }, [outputSearchIndex, outputSearchQuery])
+
+  // 当搜索查询变化时，自动跳转到第一个匹配项
+  useEffect(() => {
+    if (outputSearchQuery && outputContentRef.current) {
+      const timer = setTimeout(() => {
+        const container = outputContentRef.current!
+        const allMarks = container.querySelectorAll('mark') as NodeListOf<HTMLElement>
+        setOutputSearchIndex(allMarks.length > 0 ? 0 : -1)
+      }, 100)
+
+      return () => clearTimeout(timer)
+    } else {
+      setOutputSearchIndex(-1)
+    }
+  }, [outputSearchQuery])
 
   // 预处理 JSON 字符串，修复常见格式问题
   const preprocessJSON = (text: string): string => {
@@ -401,35 +597,59 @@ export default function JsonFormatter() {
 
   const handleFormat = () => {
     try {
+      setIsProcessing(true)
+      setProcessProgress(20)
       setError('')
       setFixLog([])
+      setProcessProgress(40)
       const parsed = parseJSON(input)
+      setProcessProgress(70)
       const formatted = JSON.stringify(parsed, null, indent)
+      setProcessProgress(90)
       setOutput(formatted)
       setParsedJson(parsed)
       setIsCompressed(false)
+      setProcessProgress(100)
     } catch (err) {
       setError(`JSON 解析错误: ${err instanceof Error ? err.message : '未知错误'}`)
       setOutput('')
       setParsedJson(null)
       setIsCompressed(false)
+      setProcessProgress(100)
+    } finally {
+      setTimeout(() => {
+        setIsProcessing(false)
+        setProcessProgress(0)
+      }, 300)
     }
   }
 
   const handleCompress = () => {
     try {
+      setIsProcessing(true)
+      setProcessProgress(20)
       setError('')
       setFixLog([])
+      setProcessProgress(40)
       const parsed = parseJSON(input)
+      setProcessProgress(70)
       const compressed = JSON.stringify(parsed)
+      setProcessProgress(90)
       setOutput(compressed)
-      setParsedJson(null) // 压缩模式不显示树形视图
+      setParsedJson(null)
       setIsCompressed(true)
+      setProcessProgress(100)
     } catch (err) {
       setError(`JSON 解析错误: ${err instanceof Error ? err.message : '未知错误'}`)
       setOutput('')
       setParsedJson(null)
       setIsCompressed(false)
+      setProcessProgress(100)
+    } finally {
+      setTimeout(() => {
+        setIsProcessing(false)
+        setProcessProgress(0)
+      }, 300)
     }
   }
 
@@ -440,6 +660,11 @@ export default function JsonFormatter() {
     setParsedJson(null)
     setFixLog([])
     setIsCompressed(false)
+    setShowOutputSearch(false)
+    setOutputSearchQuery('')
+    setOutputSearchIndex(-1)
+    setIsProcessing(false)
+    setProcessProgress(0)
   }
 
   const handleFix = (option: FixOption = 'all') => {
@@ -609,6 +834,82 @@ export default function JsonFormatter() {
 
   return (
     <div className="relative right-1/2 left-1/2 -mr-[50vw] -ml-[50vw] w-screen">
+      {/* 原生进度条 */}
+      {isProcessing && (
+        <progress 
+          value={processProgress} 
+          max={100}
+          className="fixed top-0 left-0 w-full h-1 bg-gray-200 dark:bg-gray-700"
+          style={{
+            appearance: 'none',
+            WebkitAppearance: 'none',
+          }}
+        />
+      )}
+      <style>{`
+        progress {
+          width: 100%;
+          height: 4px;
+          appearance: none;
+          -webkit-appearance: none;
+          border: none;
+          background-color: transparent;
+        }
+        progress::-webkit-progress-bar {
+          background-color: transparent;
+        }
+        progress::-webkit-progress-value {
+          background: linear-gradient(90deg, #3b82f6, #06b6d4);
+          transition: width 0.3s ease;
+        }
+        progress::-moz-progress-bar {
+          background: linear-gradient(90deg, #3b82f6, #06b6d4);
+          transition: width 0.3s ease;
+        }
+        /* 输入框滚动条样式 */
+        textarea::-webkit-scrollbar {
+          width: 8px;
+        }
+        textarea::-webkit-scrollbar-track {
+          background: #f3f4f6;
+        }
+        textarea::-webkit-scrollbar-thumb {
+          background: #d1d5db;
+          border-radius: 4px;
+          transition: background 0.3s ease;
+        }
+        textarea::-webkit-scrollbar-thumb:hover {
+          background: #9ca3af;
+        }
+        textarea::-webkit-scrollbar-thumb:active {
+          background: #6b7280;
+        }
+        /* 深色模式滚动条 */
+        @media (prefers-color-scheme: dark) {
+          textarea::-webkit-scrollbar-track {
+            background: #111827;
+          }
+          textarea::-webkit-scrollbar-thumb {
+            background: #4b5563;
+          }
+          textarea::-webkit-scrollbar-thumb:hover {
+            background: #6b7280;
+          }
+          textarea::-webkit-scrollbar-thumb:active {
+            background: #9ca3af;
+          }
+        }
+        /* Firefox 滚动条 */
+        textarea {
+          scrollbar-color: #d1d5db #f3f4f6;
+          scrollbar-width: thin;
+        }
+        @media (prefers-color-scheme: dark) {
+          textarea {
+            scrollbar-color: #4b5563 #111827;
+          }
+        }
+      `}</style>
       <div className="mx-auto max-w-[95vw] px-4 sm:px-6 lg:px-8">
         <div className="divide-y divide-gray-200 dark:divide-gray-700">
           <div className="space-y-2 pt-6 pb-6 md:space-y-3">
@@ -780,51 +1081,163 @@ export default function JsonFormatter() {
               )}
 
               {/* 输入输出区域 */}
-              <div className="grid gap-4 lg:grid-cols-2">
+              <div className="grid gap-4 lg:grid-cols-3">
                 {/* 输入框 - 带行号 */}
-                <div className="flex flex-col">
+                <div className="flex flex-col lg:col-span-1" ref={inputContainerRef}>
                   <label
                     htmlFor="input"
                     className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300"
                   >
                     输入 JSON
                   </label>
-                  <div className="flex rounded-md border border-gray-300 bg-white dark:border-gray-600 dark:bg-gray-800">
-                    {/* 行号 */}
-                    <div className="flex-shrink-0 border-r border-gray-300 bg-gray-50 px-2 py-4 text-right dark:border-gray-600 dark:bg-gray-900">
+                  <div className="flex rounded-md border border-gray-300 bg-white dark:border-gray-600 dark:bg-gray-800 overflow-hidden h-[1000px]">
+                    {/* 行号容器 */}
+                    <div 
+                      className="flex-shrink-0 border-r border-gray-300 bg-gray-50 px-2 py-4 text-right dark:border-gray-600 dark:bg-gray-900 overflow-hidden"
+                      style={{
+                        maxHeight: '1000px',
+                        lineHeight: '1.5rem',
+                      }}
+                    >
                       {input.split('\n').map((_, i) => (
                         <div
                           key={i}
-                          className="font-mono text-xs leading-6 text-gray-400 dark:text-gray-500"
+                          className="font-mono text-2xs text-gray-400 dark:text-gray-500"
+                          style={{ height: '1.5rem' }}
                         >
                           {i + 1}
                         </div>
                       ))}
                     </div>
-                    {/* 文本输入 */}
+                    {/* 文本输入 - 带滚动条 */}
                     <textarea
                       ref={inputRef}
                       id="input"
                       value={input}
                       onChange={(e) => updateInput(e.target.value)}
-                      placeholder="在此粘贴或输入 JSON 数据..."
-                      className="min-h-[300px] flex-1 resize-none overflow-auto bg-transparent p-4 font-mono text-sm text-gray-900 focus:outline-none dark:text-gray-100"
+                      onScroll={(e) => {
+                        // 同步行号滚动
+                        const lineNoDiv = e.currentTarget.previousElementSibling as HTMLElement
+                        if (lineNoDiv) {
+                          lineNoDiv.scrollTop = e.currentTarget.scrollTop
+                        }
+                      }}
+                      placeholder="在此粘贴或输入 JSON 数据... (点击后按 Ctrl+F 搜索)"
+                      className="flex-1 resize-none overflow-y-scroll bg-transparent p-4 font-mono text-xs text-gray-900 focus:outline-none dark:text-gray-100"
                       spellCheck={false}
-                      style={{ lineHeight: '1.5rem' }}
+                      style={{ 
+                        lineHeight: '1.5rem',
+                        maxHeight: '1000px',
+                      }}
                     />
                   </div>
                 </div>
 
                 {/* 输出框 - 带行号和内容 */}
-                <div className="flex flex-col">
+                <div 
+                  className="flex flex-col lg:col-span-2" 
+                  ref={outputContainerRef}
+                  onClick={() => setIsOutputSelected(true)}
+                >
                   <label
                     htmlFor="output"
                     className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300"
                   >
                     {isCompressed ? '压缩结果' : '格式化结果（点击 ▶ ▼ 折叠/展开）'}
                   </label>
+                  {/* 搜索框 - 悬浮固定 */}
+                  {showOutputSearch && (
+                    <div className="fixed z-50 rounded-md border border-blue-400 bg-white p-2 shadow-lg dark:border-blue-500 dark:bg-gray-800"
+                      style={{
+                        width: 'calc(25% - 16px)',
+                        maxWidth: '240px',
+                        top: '120px',
+                        right: '16px',
+                      }}
+                    >
+                      <div className="flex flex-col gap-1.5">
+                        <div className="flex gap-1">
+                          <input
+                            ref={outputSearchRef}
+                            type="text"
+                            placeholder="搜索..."
+                            value={outputSearchQuery}
+                            onChange={(e) => {
+                              setOutputSearchQuery(e.target.value)
+                              // 当搜索内容变化时，重置搜索索引，等待 DOM 更新后再设置
+                              setOutputSearchIndex(-1)
+                            }}
+                            onKeyDown={handleOutputSearch}
+                            className="flex-1 rounded border border-gray-300 bg-white px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
+                          />
+                          <button
+                            onClick={() => {
+                              setShowOutputSearch(false)
+                              setOutputSearchQuery('')
+                              setOutputSearchIndex(-1)
+                            }}
+                            className="rounded border border-gray-300 bg-gray-100 px-2 py-1 text-sm hover:bg-gray-200 dark:border-gray-600 dark:bg-gray-600 dark:text-gray-200 dark:hover:bg-gray-500"
+                            title="关闭搜索"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                        {/* 匹配数量显示和导航按钮 */}
+                        {outputSearchQuery && (
+                          <div className="flex items-center justify-between gap-1">
+                            <div className="text-xs text-gray-600 dark:text-gray-400">
+                              {(() => {
+                                // 直接从 DOM 获取 mark 元素数量，这样在压缩模式和格式化模式下都一致
+                                const container = outputContentRef.current
+                                const allMarks = container ? container.querySelectorAll('mark') : []
+                                if (allMarks.length === 0) return '未找到'
+                                const currentIndex = outputSearchIndex >= 0 ? outputSearchIndex : 0
+                                return `${currentIndex + 1}/${allMarks.length}`
+                              })()}
+                            </div>
+                            <div className="flex gap-1">
+                              <button
+                                onClick={() => {
+                                  const container = outputContentRef.current
+                                  const allMarks = container ? container.querySelectorAll('mark') : []
+                                  if (allMarks.length > 0) {
+                                    setOutputSearchIndex((prev) => {
+                                      const currentIndex = prev < 0 ? 0 : prev
+                                      return currentIndex > 0 ? currentIndex - 1 : allMarks.length - 1
+                                    })
+                                  }
+                                }}
+                                className="rounded bg-blue-500 px-1.5 py-0.5 text-xs text-white transition-colors hover:bg-blue-600 disabled:opacity-50 dark:bg-blue-600 dark:hover:bg-blue-700"
+                                disabled={!outputSearchQuery}
+                                title="上一个 (Enter)"
+                              >
+                                ↑
+                              </button>
+                              <button
+                                onClick={() => {
+                                  const container = outputContentRef.current
+                                  const allMarks = container ? container.querySelectorAll('mark') : []
+                                  if (allMarks.length > 0) {
+                                    setOutputSearchIndex((prev) => {
+                                      const currentIndex = prev < 0 ? 0 : prev
+                                      return (currentIndex + 1) % allMarks.length
+                                    })
+                                  }
+                                }}
+                                className="rounded bg-blue-500 px-1.5 py-0.5 text-xs text-white transition-colors hover:bg-blue-600 disabled:opacity-50 dark:bg-blue-600 dark:hover:bg-blue-700"
+                                disabled={!outputSearchQuery}
+                                title="下一个 (Enter)"
+                              >
+                                ↓
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
                   {output || parsedJson ? (
-                    <div className="flex gap-2 overflow-auto rounded-md border border-gray-300 bg-white dark:border-gray-600 dark:bg-gray-900">
+                    <div className="flex gap-2 overflow-auto rounded-md border border-gray-300 bg-white dark:border-gray-600 dark:bg-gray-900" ref={outputRef}>
                       {/* 行号 */}
                       {output && (
                         <div className="flex flex-col bg-gray-50 py-4 pr-2 pl-4 dark:bg-gray-800">
@@ -841,6 +1254,7 @@ export default function JsonFormatter() {
                       )}
                       {/* 内容区域 */}
                       <div
+                        ref={outputContentRef}
                         className="flex-1 overflow-auto"
                         style={{
                           minHeight: '300px',
@@ -848,16 +1262,75 @@ export default function JsonFormatter() {
                       >
                         {isCompressed && output ? (
                           // 压缩模式：显示文本
-                          <pre className="py-4 pr-4 font-mono text-sm text-gray-900 dark:text-gray-100">
-                            {output}
-                          </pre>
+                          outputSearchQuery ? (
+                            (() => {
+                              const matches: number[] = []
+                              const lowerOutput = output.toLowerCase()
+                              const lowerQuery = outputSearchQuery.toLowerCase()
+                              let index = 0
+                              while ((index = lowerOutput.indexOf(lowerQuery, index)) !== -1) {
+                                matches.push(index)
+                                index += 1
+                              }
+
+                              if (matches.length === 0) {
+                                return (
+                                  <pre className="py-4 pr-4 font-mono text-sm text-gray-900 dark:text-gray-100">
+                                    {output}
+                                  </pre>
+                                )
+                              }
+
+                              const parts: React.ReactNode[] = []
+                              let lastIndex = 0
+
+                              matches.forEach((matchPos, idx) => {
+                                parts.push(output.substring(lastIndex, matchPos))
+                                const isCurrentMatch = idx === outputSearchIndex
+                                parts.push(
+                                  <mark
+                                    key={`match-${idx}`}
+                                    data-search-index={idx}
+                                    className={`${
+                                      isCurrentMatch
+                                        ? 'bg-orange-400 dark:bg-orange-500 font-bold text-black dark:text-white'
+                                        : 'bg-yellow-300 dark:bg-yellow-600 text-gray-900 dark:text-gray-100'
+                                    }`}
+                                  >
+                                    {output.substring(matchPos, matchPos + outputSearchQuery.length)}
+                                  </mark>
+                                )
+                                lastIndex = matchPos + outputSearchQuery.length
+                              })
+
+                              parts.push(output.substring(lastIndex))
+                              return (
+                                <pre className="py-4 pr-4 font-mono text-sm text-gray-900 dark:text-gray-100">
+                                  {parts}
+                                </pre>
+                              )
+                            })()
+                          ) : (
+                            <pre className="py-4 pr-4 font-mono text-sm text-gray-900 dark:text-gray-100">
+                              {output}
+                            </pre>
+                          )
                         ) : parsedJson ? (
                           // 格式化模式：显示树形视图
                           <div className="w-full p-4">
+                            {output.length > 50000 && !isCompressed && (
+                              <div className="mb-4 rounded-md bg-blue-50 p-3 dark:bg-blue-900/20">
+                                <p className="text-sm text-blue-700 dark:text-blue-300">
+                                  💡 数据量较大（{Math.round(output.length / 1024)}KB），建议使用「压缩」模式查看或搜索，性能更好
+                                </p>
+                              </div>
+                            )}
                             <JsonNode
                               data={parsedJson}
                               indent={indent}
                               onCopySuccess={showCopyToast}
+                              searchQuery={outputSearchQuery}
+                              searchIndex={outputSearchIndex}
                             />
                           </div>
                         ) : null}
