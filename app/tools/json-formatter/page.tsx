@@ -844,7 +844,6 @@ export default function JsonFormatter() {
                         className="flex-1 overflow-auto"
                         style={{
                           minHeight: '300px',
-                          maxHeight: 'calc(100vh - 350px)',
                         }}
                       >
                         {isCompressed && output ? (
@@ -870,7 +869,6 @@ export default function JsonFormatter() {
                         className="text-sm text-gray-500 dark:text-gray-400"
                         style={{
                           minHeight: '300px',
-                          maxHeight: 'calc(100vh - 350px)',
                         }}
                       >
                         格式化后的 JSON 将显示在这里...
