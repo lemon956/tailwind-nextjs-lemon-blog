@@ -78,7 +78,7 @@ const HighlightText = memo(function HighlightText({ text, searchQuery }: Highlig
     parts.push(
       <mark
         key={`match-${i}`}
-        className="bg-yellow-300 dark:bg-yellow-600 text-gray-900 dark:text-gray-100"
+        className="bg-yellow-300 text-gray-900 dark:bg-yellow-600 dark:text-gray-100"
       >
         {text.substring(match.start, match.end)}
       </mark>
@@ -101,7 +101,15 @@ interface JsonNodeProps {
   searchIndex?: number
 }
 
-const JsonNode = memo(function JsonNode({ data, keyName, level = 0, indent = 2, onCopySuccess, searchQuery = '', searchIndex = -1 }: JsonNodeProps) {
+const JsonNode = memo(function JsonNode({
+  data,
+  keyName,
+  level = 0,
+  indent = 2,
+  onCopySuccess,
+  searchQuery = '',
+  searchIndex = -1,
+}: JsonNodeProps) {
   const [collapsed, setCollapsed] = useState(false)
   const [showCopy, setShowCopy] = useState(false)
   const isObject = typeof data === 'object' && data !== null && !Array.isArray(data)
@@ -228,7 +236,10 @@ const JsonNode = memo(function JsonNode({ data, keyName, level = 0, indent = 2, 
             {collapsed && (
               <>
                 <span className="ml-2 text-xs text-gray-400 italic dark:text-gray-500">
-                  <HighlightText text={`${itemCount} ${isArray ? (itemCount === 1 ? 'item' : 'items') : (itemCount === 1 ? 'key' : 'keys')}`} searchQuery={searchQuery} />
+                  <HighlightText
+                    text={`${itemCount} ${isArray ? (itemCount === 1 ? 'item' : 'items') : itemCount === 1 ? 'key' : 'keys'}`}
+                    searchQuery={searchQuery}
+                  />
                 </span>
                 <span className="ml-1 font-bold text-gray-700 dark:text-gray-300">
                   <HighlightText text={closeBracket} searchQuery={searchQuery} />
@@ -314,60 +325,63 @@ export default function JsonFormatter() {
   const outputContainerRef = useRef<HTMLDivElement>(null)
 
   // 带历史记录的输入更新 - 自动格式化
-  const updateInput = useCallback((value: string) => {
-    setInput(value)
-    setError('')
-    setIsProcessing(true)
-    setProcessProgress(0)
+  const updateInput = useCallback(
+    (value: string) => {
+      setInput(value)
+      setError('')
+      setIsProcessing(true)
+      setProcessProgress(0)
 
-    // 添加历史记录
-    setInputHistory((prev) => {
-      const newHistory = historyIndex >= 0 ? prev.slice(0, historyIndex + 1) : prev
-      const updated = [...newHistory, value].slice(-10)
-      setHistoryIndex(updated.length - 1)
-      return updated
-    })
+      // 添加历史记录
+      setInputHistory((prev) => {
+        const newHistory = historyIndex >= 0 ? prev.slice(0, historyIndex + 1) : prev
+        const updated = [...newHistory, value].slice(-10)
+        setHistoryIndex(updated.length - 1)
+        return updated
+      })
 
-    // 立即执行格式化
-    try {
-      if (value.trim()) {
-        setProcessProgress(25)
-        const processedText = preprocessJSON(value)
-        setProcessProgress(50)
-        
-        let parsed = JSON.parse(processedText)
-        setProcessProgress(65)
+      // 立即执行格式化
+      try {
+        if (value.trim()) {
+          setProcessProgress(25)
+          const processedText = preprocessJSON(value)
+          setProcessProgress(50)
 
-        if (typeof parsed === 'string') {
-          try {
-            parsed = JSON.parse(preprocessJSON(parsed))
-          } catch {
-            // 忽略第二次解析失败
+          let parsed = JSON.parse(processedText)
+          setProcessProgress(65)
+
+          if (typeof parsed === 'string') {
+            try {
+              parsed = JSON.parse(preprocessJSON(parsed))
+            } catch {
+              // 忽略第二次解析失败
+            }
           }
-        }
 
-        setProcessProgress(80)
-        const formatted = JSON.stringify(parsed, null, indent)
-        setProcessProgress(95)
-        
-        setOutput(formatted)
-        setParsedJson(parsed)
-        setIsCompressed(false)
-      } else {
-        setOutput('')
-        setParsedJson(null)
-        setIsCompressed(false)
+          setProcessProgress(80)
+          const formatted = JSON.stringify(parsed, null, indent)
+          setProcessProgress(95)
+
+          setOutput(formatted)
+          setParsedJson(parsed)
+          setIsCompressed(false)
+        } else {
+          setOutput('')
+          setParsedJson(null)
+          setIsCompressed(false)
+        }
+      } catch {
+        // 解析失败不显示错误
+      } finally {
+        setProcessProgress(100)
+        setTimeout(() => {
+          setIsProcessing(false)
+          setProcessProgress(0)
+        }, 300)
       }
-    } catch {
-      // 解析失败不显示错误
-    } finally {
-      setProcessProgress(100)
-      setTimeout(() => {
-        setIsProcessing(false)
-        setProcessProgress(0)
-      }, 300)
-    }
-  }, [historyIndex, indent])
+    },
+    [historyIndex, indent]
+  )
 
   // 撤销操作（Ctrl+Z）
   const handleUndo = useCallback(() => {
@@ -515,7 +529,7 @@ export default function JsonFormatter() {
             currentMatch.scrollIntoView({
               behavior: 'smooth',
               block: 'center',
-              inline: 'nearest'
+              inline: 'nearest',
             })
           }
         }
@@ -836,10 +850,10 @@ export default function JsonFormatter() {
     <div className="relative right-1/2 left-1/2 -mr-[50vw] -ml-[50vw] w-screen">
       {/* 原生进度条 */}
       {isProcessing && (
-        <progress 
-          value={processProgress} 
+        <progress
+          value={processProgress}
           max={100}
-          className="fixed top-0 left-0 w-full h-1 bg-gray-200 dark:bg-gray-700"
+          className="fixed top-0 left-0 h-1 w-full bg-gray-200 dark:bg-gray-700"
           style={{
             appearance: 'none',
             WebkitAppearance: 'none',
@@ -1090,10 +1104,10 @@ export default function JsonFormatter() {
                   >
                     输入 JSON
                   </label>
-                  <div className="flex rounded-md border border-gray-300 bg-white dark:border-gray-600 dark:bg-gray-800 overflow-hidden h-[1000px]">
+                  <div className="flex h-[1000px] overflow-hidden rounded-md border border-gray-300 bg-white dark:border-gray-600 dark:bg-gray-800">
                     {/* 行号容器 */}
-                    <div 
-                      className="flex-shrink-0 border-r border-gray-300 bg-gray-50 px-2 py-4 text-right dark:border-gray-600 dark:bg-gray-900 overflow-hidden"
+                    <div
+                      className="flex-shrink-0 overflow-hidden border-r border-gray-300 bg-gray-50 px-2 py-4 text-right dark:border-gray-600 dark:bg-gray-900"
                       style={{
                         maxHeight: '1000px',
                         lineHeight: '1.5rem',
@@ -1102,7 +1116,7 @@ export default function JsonFormatter() {
                       {input.split('\n').map((_, i) => (
                         <div
                           key={i}
-                          className="font-mono text-2xs text-gray-400 dark:text-gray-500"
+                          className="text-2xs font-mono text-gray-400 dark:text-gray-500"
                           style={{ height: '1.5rem' }}
                         >
                           {i + 1}
@@ -1125,7 +1139,7 @@ export default function JsonFormatter() {
                       placeholder="在此粘贴或输入 JSON 数据... (点击后按 Ctrl+F 搜索)"
                       className="flex-1 resize-none overflow-y-scroll bg-transparent p-4 font-mono text-xs text-gray-900 focus:outline-none dark:text-gray-100"
                       spellCheck={false}
-                      style={{ 
+                      style={{
                         lineHeight: '1.5rem',
                         maxHeight: '1000px',
                       }}
@@ -1134,10 +1148,18 @@ export default function JsonFormatter() {
                 </div>
 
                 {/* 输出框 - 带行号和内容 */}
-                <div 
-                  className="flex flex-col lg:col-span-2" 
+                <div
+                  className="flex flex-col lg:col-span-2"
                   ref={outputContainerRef}
                   onClick={() => setIsOutputSelected(true)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      setIsOutputSelected(true)
+                    }
+                  }}
+                  tabIndex={0}
+                  role="button"
+                  aria-label="选择输出框"
                 >
                   <label
                     htmlFor="output"
@@ -1147,7 +1169,8 @@ export default function JsonFormatter() {
                   </label>
                   {/* 搜索框 - 悬浮固定 */}
                   {showOutputSearch && (
-                    <div className="fixed z-50 rounded-md border border-blue-400 bg-white p-2 shadow-lg dark:border-blue-500 dark:bg-gray-800"
+                    <div
+                      className="fixed z-50 rounded-md border border-blue-400 bg-white p-2 shadow-lg dark:border-blue-500 dark:bg-gray-800"
                       style={{
                         width: 'calc(25% - 16px)',
                         maxWidth: '240px',
@@ -1168,7 +1191,7 @@ export default function JsonFormatter() {
                               setOutputSearchIndex(-1)
                             }}
                             onKeyDown={handleOutputSearch}
-                            className="flex-1 rounded border border-gray-300 bg-white px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
+                            className="flex-1 rounded border border-gray-300 bg-white px-2 py-1 text-sm focus:ring-1 focus:ring-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
                           />
                           <button
                             onClick={() => {
@@ -1199,11 +1222,15 @@ export default function JsonFormatter() {
                               <button
                                 onClick={() => {
                                   const container = outputContentRef.current
-                                  const allMarks = container ? container.querySelectorAll('mark') : []
+                                  const allMarks = container
+                                    ? container.querySelectorAll('mark')
+                                    : []
                                   if (allMarks.length > 0) {
                                     setOutputSearchIndex((prev) => {
                                       const currentIndex = prev < 0 ? 0 : prev
-                                      return currentIndex > 0 ? currentIndex - 1 : allMarks.length - 1
+                                      return currentIndex > 0
+                                        ? currentIndex - 1
+                                        : allMarks.length - 1
                                     })
                                   }
                                 }}
@@ -1216,7 +1243,9 @@ export default function JsonFormatter() {
                               <button
                                 onClick={() => {
                                   const container = outputContentRef.current
-                                  const allMarks = container ? container.querySelectorAll('mark') : []
+                                  const allMarks = container
+                                    ? container.querySelectorAll('mark')
+                                    : []
                                   if (allMarks.length > 0) {
                                     setOutputSearchIndex((prev) => {
                                       const currentIndex = prev < 0 ? 0 : prev
@@ -1237,7 +1266,10 @@ export default function JsonFormatter() {
                     </div>
                   )}
                   {output || parsedJson ? (
-                    <div className="flex gap-2 overflow-auto rounded-md border border-gray-300 bg-white dark:border-gray-600 dark:bg-gray-900" ref={outputRef}>
+                    <div
+                      className="flex gap-2 overflow-auto rounded-md border border-gray-300 bg-white dark:border-gray-600 dark:bg-gray-900"
+                      ref={outputRef}
+                    >
                       {/* 行号 */}
                       {output && (
                         <div className="flex flex-col bg-gray-50 py-4 pr-2 pl-4 dark:bg-gray-800">
@@ -1293,11 +1325,14 @@ export default function JsonFormatter() {
                                     data-search-index={idx}
                                     className={`${
                                       isCurrentMatch
-                                        ? 'bg-orange-400 dark:bg-orange-500 font-bold text-black dark:text-white'
-                                        : 'bg-yellow-300 dark:bg-yellow-600 text-gray-900 dark:text-gray-100'
+                                        ? 'bg-orange-400 font-bold text-black dark:bg-orange-500 dark:text-white'
+                                        : 'bg-yellow-300 text-gray-900 dark:bg-yellow-600 dark:text-gray-100'
                                     }`}
                                   >
-                                    {output.substring(matchPos, matchPos + outputSearchQuery.length)}
+                                    {output.substring(
+                                      matchPos,
+                                      matchPos + outputSearchQuery.length
+                                    )}
                                   </mark>
                                 )
                                 lastIndex = matchPos + outputSearchQuery.length
@@ -1321,7 +1356,8 @@ export default function JsonFormatter() {
                             {output.length > 50000 && !isCompressed && (
                               <div className="mb-4 rounded-md bg-blue-50 p-3 dark:bg-blue-900/20">
                                 <p className="text-sm text-blue-700 dark:text-blue-300">
-                                  💡 数据量较大（{Math.round(output.length / 1024)}KB），建议使用「压缩」模式查看或搜索，性能更好
+                                  💡 数据量较大（{Math.round(output.length / 1024)}
+                                  KB），建议使用「压缩」模式查看或搜索，性能更好
                                 </p>
                               </div>
                             )}
