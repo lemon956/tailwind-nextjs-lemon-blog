@@ -308,7 +308,7 @@ export default function JsonFormatter() {
   const [fixLog, setFixLog] = useState<string[]>([])
   const [showFixMenu, setShowFixMenu] = useState(false)
   const [isCompressed, setIsCompressed] = useState(false)
-  const [inputHistory, setInputHistory] = useState<string[]>([])
+  const [inputHistory, setInputHistory] = useState<Array<{ value: string; cursorPos: number }>>([])
   const [historyIndex, setHistoryIndex] = useState(-1)
   const [showOutputSearch, setShowOutputSearch] = useState(false)
   const [outputSearchQuery, setOutputSearchQuery] = useState('')
@@ -326,7 +326,7 @@ export default function JsonFormatter() {
 
   // 带历史记录的输入更新 - 自动格式化
   const updateInput = useCallback(
-    (value: string) => {
+    (value: string, shouldMoveCursor = false, cursorPos: number = 0) => {
       setInput(value)
       setError('')
       setIsProcessing(true)
@@ -335,10 +335,22 @@ export default function JsonFormatter() {
       // 添加历史记录
       setInputHistory((prev) => {
         const newHistory = historyIndex >= 0 ? prev.slice(0, historyIndex + 1) : prev
-        const updated = [...newHistory, value].slice(-10)
+        const updated = [...newHistory, { value, cursorPos }].slice(-10)
         setHistoryIndex(updated.length - 1)
         return updated
       })
+
+      // 如果需要移动光标，在处理完成后设置光标位置
+      if (shouldMoveCursor) {
+        setTimeout(() => {
+          if (inputRef.current) {
+            const length = inputRef.current.value.length
+            inputRef.current.selectionStart = length
+            inputRef.current.selectionEnd = length
+            inputRef.current.focus()
+          }
+        }, 100) // 增加延迟时间确保DOM更新完成
+      }
 
       // 立即执行格式化
       try {
@@ -377,6 +389,14 @@ export default function JsonFormatter() {
         setTimeout(() => {
           setIsProcessing(false)
           setProcessProgress(0)
+
+          // 如果需要移动光标，在处理完成后设置光标位置
+          if (shouldMoveCursor && inputRef.current) {
+            const length = inputRef.current.value.length
+            inputRef.current.selectionStart = length
+            inputRef.current.selectionEnd = length
+            inputRef.current.focus()
+          }
         }, 300)
       }
     },
@@ -388,18 +408,20 @@ export default function JsonFormatter() {
     if (historyIndex > 0) {
       const newIndex = historyIndex - 1
       setHistoryIndex(newIndex)
-      setInput(inputHistory[newIndex])
+      const historyItem = inputHistory[newIndex]
+      setInput(historyItem.value)
       setError('') // 撤销时清除错误
+
+      // 恢复光标位置
+      setTimeout(() => {
+        if (inputRef.current) {
+          inputRef.current.selectionStart = historyItem.cursorPos
+          inputRef.current.selectionEnd = historyItem.cursorPos
+          inputRef.current.focus()
+        }
+      }, 0)
     }
   }, [historyIndex, inputHistory])
-
-  // 当输入改变时，将光标移到末尾
-  useEffect(() => {
-    if (inputRef.current) {
-      inputRef.current.selectionStart = input.length
-      inputRef.current.selectionEnd = input.length
-    }
-  }, [input])
 
   // 显示复制成功的浮窗提示
   const showCopyToast = () => {
@@ -668,7 +690,7 @@ export default function JsonFormatter() {
   }
 
   const handleClear = () => {
-    updateInput('')
+    updateInput('', false, 0)
     setOutput('')
     setError('')
     setParsedJson(null)
@@ -805,7 +827,7 @@ export default function JsonFormatter() {
           logs.push('📊 字符数量未变化')
         }
 
-        updateInput(text)
+        updateInput(text, true, text.length) // 修复后的结果，将光标移动到末尾
         setFixLog(logs)
         setError('')
       } catch (parseErr) {
@@ -842,7 +864,7 @@ export default function JsonFormatter() {
       hobbies: ['阅读', '编程', '旅行'],
       active: true,
     }
-    updateInput(JSON.stringify(sample))
+    updateInput(JSON.stringify(sample), true, JSON.stringify(sample).length) // 设置shouldMoveCursor为true，光标到末尾
     setFixLog([])
   }
 
@@ -1128,7 +1150,41 @@ export default function JsonFormatter() {
                       ref={inputRef}
                       id="input"
                       value={input}
-                      onChange={(e) => updateInput(e.target.value)}
+                      onChange={(e) => {
+                        const textarea = e.target
+                        const cursorPos = textarea.selectionStart
+                        updateInput(textarea.value, false, cursorPos)
+                      }}
+                      onPaste={(e) => {
+                        // 阻止默认粘贴行为，我们手动处理
+                        e.preventDefault()
+
+                        // 获取粘贴前的光标位置和选中范围
+                        const textarea = e.currentTarget
+                        const startPos = textarea.selectionStart
+                        const endPos = textarea.selectionEnd
+                        const pastedText = e.clipboardData.getData('text')
+
+                        // 手动插入粘贴内容
+                        const beforeText = textarea.value.substring(0, startPos)
+                        const afterText = textarea.value.substring(endPos)
+                        const newValue = beforeText + pastedText + afterText
+
+                        // 计算粘贴后的光标位置（粘贴内容的末尾）
+                        const newCursorPos = startPos + pastedText.length
+
+                        // 更新输入值，保存粘贴后的光标位置
+                        updateInput(newValue, false, newCursorPos)
+
+                        // 设置光标到粘贴内容的末尾
+                        setTimeout(() => {
+                          if (inputRef.current) {
+                            inputRef.current.selectionStart = newCursorPos
+                            inputRef.current.selectionEnd = newCursorPos
+                            inputRef.current.focus()
+                          }
+                        }, 0)
+                      }}
                       onScroll={(e) => {
                         // 同步行号滚动
                         const lineNoDiv = e.currentTarget.previousElementSibling as HTMLElement
