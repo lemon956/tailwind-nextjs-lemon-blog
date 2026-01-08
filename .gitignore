@@ -4,10 +4,9 @@
 /node_modules
 /.pnp
 .pnp.js
-/.yarn/*
-!/.yarn/releases
-!/.yarn/plugins
-!/.yarn/sdks
+/.yarn/
+.yarnrc.yml
+yarn.lock
 
 # testing
 /coverage
@@ -45,3 +44,6 @@ yarn-error.log*
 
 # Contentlayer
 .contentlayer
+
+# markdown files
+NETLIFY_DEPLOY.md
