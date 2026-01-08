@@ -76,10 +76,5 @@
   "packageManager": "yarn@3.6.1",
   "overrides": {
     "@types/react": "19.2.7"
-  },
-  "resolutions": {
-    "kbar": "latest",
-    "next-themes": "latest",
-    "react-virtual": "latest"
   }
 }
