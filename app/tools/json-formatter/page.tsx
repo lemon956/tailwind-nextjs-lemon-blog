@@ -324,18 +324,6 @@ export default function JsonFormatter() {
   const inputContainerRef = useRef<HTMLDivElement>(null)
   const outputContainerRef = useRef<HTMLDivElement>(null)
 
-  // 添加 Google AdSense meta 标签
-  useEffect(() => {
-    const meta = document.createElement('meta')
-    meta.name = 'google-adsense-account'
-    meta.content = 'ca-pub-2297597965492195'
-    document.head.appendChild(meta)
-
-    return () => {
-      document.head.removeChild(meta)
-    }
-  }, [])
-
   // 带历史记录的输入更新 - 自动格式化
   const updateInput = useCallback(
     (value: string, shouldMoveCursor = false, cursorPos: number = 0) => {
