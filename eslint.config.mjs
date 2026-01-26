@@ -17,7 +17,7 @@ const compat = new FlatCompat({
 
 export default [...nextTypescript, {
   ignores: ['next.config.js'],
-}, js.configs.recommended, ...compat.extends("plugin:@typescript-eslint/eslint-recommended"), ...compat.extends("plugin:@typescript-eslint/recommended"), ...compat.extends("plugin:jsx-a11y/recommended"), ...compat.extends("plugin:prettier/recommended"), ...next, ...nextCoreWebVitals, {
+}, js.configs.recommended, ...compat.extends("plugin:@typescript-eslint/eslint-recommended"), ...compat.extends("plugin:@typescript-eslint/recommended"), ...compat.extends("plugin:prettier/recommended"), ...next, ...nextCoreWebVitals, {
   plugins: {
     '@typescript-eslint': typescriptEslint,
   },
