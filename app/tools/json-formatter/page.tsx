@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useRef, useEffect, useCallback, memo } from 'react'
-import Script from 'next/script'
 import { genPageMetadata } from 'app/seo'
 
 // 修复选项类型
@@ -324,6 +323,18 @@ export default function JsonFormatter() {
   const outputSearchRef = useRef<HTMLInputElement>(null)
   const inputContainerRef = useRef<HTMLDivElement>(null)
   const outputContainerRef = useRef<HTMLDivElement>(null)
+
+  // 添加 Google AdSense meta 标签
+  useEffect(() => {
+    const meta = document.createElement('meta')
+    meta.name = 'google-adsense-account'
+    meta.content = 'ca-pub-2297597965492195'
+    document.head.appendChild(meta)
+
+    return () => {
+      document.head.removeChild(meta)
+    }
+  }, [])
 
   // 带历史记录的输入更新 - 自动格式化
   const updateInput = useCallback(
@@ -871,13 +882,6 @@ export default function JsonFormatter() {
 
   return (
     <div className="relative right-1/2 left-1/2 -mr-[50vw] -ml-[50vw] w-screen">
-      {/* Google AdSense 脚本 */}
-      <Script
-        async
-        src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-2297597965492195"
-        crossOrigin="anonymous"
-        strategy="afterInteractive"
-      />
       {/* 原生进度条 */}
       {isProcessing && (
         <progress
