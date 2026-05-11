@@ -29,6 +29,7 @@ public/sitemap.xml
 
 # misc
 .DS_Store
+.superpowers/
 
 # debug
 *.log
@@ -48,4 +49,3 @@ yarn-error.log*
 # markdown files
 NETLIFY_DEPLOY.md
 VERCEL_DEPLOY.md
-
