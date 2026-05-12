@@ -1,6 +1,6 @@
-import nextTypescript from "eslint-config-next/typescript";
-import next from "eslint-config-next";
-import nextCoreWebVitals from "eslint-config-next/core-web-vitals";
+import nextTypescript from 'eslint-config-next/typescript'
+import next from 'eslint-config-next'
+import nextCoreWebVitals from 'eslint-config-next/core-web-vitals'
 import typescriptEslint from '@typescript-eslint/eslint-plugin'
 import globals from 'globals'
 import tsParser from '@typescript-eslint/parser'
@@ -15,47 +15,59 @@ const compat = new FlatCompat({
   baseDirectory: __dirname,
 })
 
-export default [...nextTypescript, {
-  ignores: ['next.config.js'],
-}, js.configs.recommended, ...compat.extends("plugin:@typescript-eslint/eslint-recommended"), ...compat.extends("plugin:@typescript-eslint/recommended"), ...compat.extends("plugin:prettier/recommended"), ...next, ...nextCoreWebVitals, {
-  plugins: {
-    '@typescript-eslint': typescriptEslint,
+export default [
+  ...nextTypescript,
+  {
+    ignores: ['next.config.js'],
   },
-
-  languageOptions: {
-    globals: {
-      ...globals.browser,
-      ...globals.amd,
-      ...globals.node,
+  js.configs.recommended,
+  ...compat.extends(
+    'plugin:@typescript-eslint/eslint-recommended',
+    'plugin:@typescript-eslint/recommended',
+    'plugin:prettier/recommended'
+  ),
+  ...next,
+  ...nextCoreWebVitals,
+  {
+    plugins: {
+      '@typescript-eslint': typescriptEslint,
     },
 
-    parser: tsParser,
-    ecmaVersion: 5,
-    sourceType: 'commonjs',
-
-    parserOptions: {
-      project: true,
-      tsconfigRootDir: __dirname,
-    },
-  },
-
-  rules: {
-    'prettier/prettier': 'error',
-    'react/react-in-jsx-scope': 'off',
-
-    'jsx-a11y/anchor-is-valid': [
-      'error',
-      {
-        components: ['Link'],
-        specialLink: ['hrefLeft', 'hrefRight'],
-        aspects: ['invalidHref', 'preferButton'],
+    languageOptions: {
+      globals: {
+        ...globals.browser,
+        ...globals.amd,
+        ...globals.node,
       },
-    ],
-    'react/prop-types': 'off',
-    '@typescript-eslint/no-unused-vars': 'off',
-    'react/no-unescaped-entities': 'off',
-    '@typescript-eslint/explicit-module-boundary-types': 'off',
-    '@typescript-eslint/no-var-requires': 'off',
-    '@typescript-eslint/ban-ts-comment': 'off',
+
+      parser: tsParser,
+      ecmaVersion: 5,
+      sourceType: 'commonjs',
+
+      parserOptions: {
+        project: true,
+        tsconfigRootDir: __dirname,
+      },
+    },
+
+    rules: {
+      'prettier/prettier': 'error',
+      'react/react-in-jsx-scope': 'off',
+
+      'jsx-a11y/anchor-is-valid': [
+        'error',
+        {
+          components: ['Link'],
+          specialLink: ['hrefLeft', 'hrefRight'],
+          aspects: ['invalidHref', 'preferButton'],
+        },
+      ],
+      'react/prop-types': 'off',
+      '@typescript-eslint/no-unused-vars': 'off',
+      'react/no-unescaped-entities': 'off',
+      '@typescript-eslint/explicit-module-boundary-types': 'off',
+      '@typescript-eslint/no-var-requires': 'off',
+      '@typescript-eslint/ban-ts-comment': 'off',
+    },
   },
-}];
+]
