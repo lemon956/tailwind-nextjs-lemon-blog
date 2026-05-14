@@ -1,0 +1,189 @@
+---
+title: 用 Termux 把 Android 平板变成应急开发机
+title_candidates:
+  - 平板吃灰？用 Termux 打造一台随身开发机
+  - 你的电脑不一定是电脑：用 Termux 改造 Android 平板
+  - 别再让平板盖泡面了，用 Termux 把它变成开发机
+  - 出门没带电脑？用 Termux 让平板也能 SSH 排查问题
+  - Android 平板上的轻量级 Linux 开发环境搭建
+tags:
+  - Termux
+  - Android
+  - 平板
+  - 开发环境
+  - 应急排查
+  - 命令行
+  - tmux
+  - Neovim
+status: done
+date: 2026-05-14
+---
+
+## 前言
+
+收到线上告警时，最尴尬的不是问题复杂，而是身边没有电脑。手机能看消息、看监控，但要 SSH 到服务器、翻日志、改个配置、跑几个命令，体验就很勉强。
+
+我这台平板以前也差不多只负责吃饭看剧，更多时候放在家里吃灰。后来折腾了一套 Termux 环境，目标很明确：不把平板改造成主力开发机，只让它在外出时变成一台够用的应急开发机。能连服务器、能开多个终端、能改一点代码或配置、能查常见问题，就已经值回票价。
+
+触摸屏当然不适合长时间敲代码，所以键盘基本是必需品。我用的是华为 MatePad 自带的星闪键盘，连接稳定，打字手感也够用。如果你只想低成本尝试，几十块的蓝牙键盘也比纯触屏强很多。有了键盘，tmux、fish、nvim 这些工具才算真正进入可用状态。
+
+ps：其实这篇文章从 2025 年中旬我初步配置完成的时候就已经想写了。起因是一位同事说可以写一篇《你的电脑不一定是台电脑》，结果一直到 2026 年 1 月才真正动手，拖延症患者实锤了。
+
+### 注：本文方案仅适用于 Android 系统的手机或者平板。
+
+## 整体思路
+
+这套方案不是“在平板上完整复刻电脑”，而是围绕应急场景做取舍：
+
+1. 准备平板和实体键盘，先解决输入体验。
+2. 用 Bitwarden 管理服务器密码、密钥和常用敏感信息。
+3. 用 Termux 提供 Linux 命令行环境。
+4. 用 fish 提升终端交互体验。
+5. 用 tmux 管理多个终端会话。
+6. 用 Neovim 做轻量代码编辑。
+
+按照这个顺序配置，基本就能把一台 Android 平板变成可以随身带走的备用开发终端。
+
+## 一、准备平板和键盘
+
+平板本体只要是 Android 系统即可，性能不需要特别夸张。Termux 本身很轻，真正影响体验的是键盘、屏幕尺寸和网络。
+
+我建议至少准备一个实体键盘。纯触屏可以临时执行一两条命令，但一旦进入 tmux、nvim 或者频繁输入符号，效率会明显下降。蓝牙键盘、平板原厂键盘都可以，重点是连接稳定、方向键和常用组合键好按。
+
+## 二、准备密码管理工具
+
+[Bitwarden](https://bitwarden.com/) 不是 Termux 的一部分，但在应急场景里非常重要。外出时临时处理问题，经常会遇到需要服务器账号、SSH 密钥、数据库密码、后台登录信息的情况。如果全靠手动输入强密码，既慢也容易出错。
+
+我选择 Bitwarden 的原因主要有三个：
+
+1. 客户端覆盖 Windows、macOS、Linux、Android、iOS 和主流浏览器。
+2. 除了密码，也可以保存 SSH 密钥、银行卡、备注等信息。
+3. 支持自托管，比较在意数据控制权的话可以部署 [Vaultwarden](https://github.com/dani-garcia/vaultwarden)。
+
+安装方式比较直接：能用 Google Play 的用户可以从商店下载；不能直接使用 Google Play 的华为设备，可以通过「出境易」或「卓易通」安装。平板上建议把常用的服务器密钥、数据库密码设为「收藏」，打开 App 后能更快找到。
+
+## 三、安装 Termux
+
+[Termux](https://github.com/termux/termux-app) 是这套方案的核心。它可以在 Android 设备上提供一个不需要 Root 的 Linux 命令行环境，并通过包管理器安装 Git、OpenSSH、Python、Node.js、Neovim 等常用工具。
+
+我没有选择在平板上跑完整桌面 Linux。那种方案看起来更接近电脑，但资源占用更高，配置链路也更复杂。应急设备最重要的是稳定、轻量、随时能打开，所以 Termux 这种命令行方案反而更合适。
+
+### 下载方式
+
+推荐从下面两个来源安装：
+
+- 通过 [F-Droid](https://f-droid.org/en/packages/com.termux/) 安装。
+- 通过 [GitHub Releases](https://github.com/termux/termux-app/releases/latest) 下载 APK。
+
+注意不要混装不同来源的 Termux 主程序和插件。例如主程序从 F-Droid 安装，插件却从 GitHub 安装，就可能因为签名不同导致无法正常工作。选择一个来源后，Termux:API、Termux:Boot 这类插件也尽量从同一个来源安装。
+
+### 初始化
+
+第一次打开 Termux 后，先更新软件包，再安装基础工具：
+
+```bash
+pkg update
+pkg upgrade
+pkg install git openssh
+```
+
+如果需要让 Termux 访问 Android 的共享存储，可以执行：
+
+```bash
+termux-setup-storage
+```
+
+我只额外安装了 [Termux:API](https://github.com/termux/termux-api)，主要是为了在 tmux 状态栏里显示电量。安装插件 App 后，还需要在 Termux 里安装对应命令行包：
+
+```bash
+pkg install termux-api
+```
+
+其他插件可以按需选择：
+
+- Termux:Boot：开机后自动执行脚本。
+- Termux:Float：使用悬浮终端窗口。
+- Termux:Styling：调整主题和字体。
+- Termux:Tasker：配合 Tasker 做自动化。
+- Termux:Widget：在桌面放常用脚本入口。
+
+![[termux_start.jpg]]
+
+## 四、配置 Fish Shell
+
+[fish shell](https://github.com/fish-shell/fish-shell) 的优势是开箱即用。自动补全、语法高亮、历史命令建议这些功能不需要再额外配置一套复杂插件，对平板上的轻量环境很友好。
+
+它的缺点也很明确：fish 不完全兼容通用 shell 语法。如果你经常写 shell 脚本，或者团队脚本都默认 bash/zsh，那就继续用自己熟悉的 shell。这里选择 fish，只是为了让日常交互更舒服。
+
+在 Termux 里直接安装即可：
+
+```bash
+pkg install fish
+chsh -s fish
+```
+
+安装后可以先直接使用。如果后续有个性化需求，再修改 `~/.config/fish` 目录下的配置文件。
+
+## 五、配置 Tmux
+
+[tmux](https://github.com/tmux/tmux) 是终端复用器。平板不像电脑那样方便开很多终端窗口，所以用 tmux 管理多个会话和窗口会更顺手。
+
+我选择 tmux 主要是因为自己一直在用，肌肉记忆已经形成。如果你之前没有固定习惯，也可以试试 zellij、byobu 等工具。对于这套应急环境来说，核心需求只有一个：能快速在多个命令行任务之间切换。
+
+安装命令：
+
+```bash
+pkg install tmux
+```
+
+tmux 配置可以用网上成熟的方案，也可以从简单配置开始。比如 [Oh my tmux](https://github.com/gpakosz/.tmux/tree/master) 是一个常见选择；如果想参考我的配置，可以使用 [lemon-tmux](https://github.com/lemon956/lemon-tmux)：
+
+```bash
+git clone https://github.com/lemon956/lemon-tmux.git ~/lemon-tmux
+ln -s ~/lemon-tmux/.tmux.conf ~/.tmux.conf
+```
+
+常用命令可以先记这几个：
+
+```bash
+# 新建会话（比如叫 emergency，应急用）
+tmux new -s emergency
+
+# 查看所有会话
+tmux ls
+
+# 直接连上次的会话（上次没看完的日志还在）
+tmux a
+
+# 连指定会话
+tmux a -t emergency
+
+# 关会话（用完记得关，省内存）
+tmux kill-session -t emergency
+```
+
+## 六、配置 Neovim
+
+[Neovim](https://github.com/neovim/neovim) 在这里不是为了替代完整 IDE，而是用来做轻量编辑：改配置、看代码、临时处理脚本。平板终端环境里，打开 VS Code、Cursor 这类完整编辑器并不现实，nvim 这种终端编辑器更符合这套设备定位。
+
+安装命令：
+
+```bash
+pkg install neovim
+```
+
+配置上不建议一开始就拉很重的插件集合。Android 设备资源有限，插件越多，启动和排错成本越高。可以先用一套轻量配置，再按实际需要逐步增加功能。
+
+如果想参考我的配置，可以拉取 [lemon-nvim](https://github.com/lemon956/lemon-nvim)：
+
+```bash
+git clone https://github.com/lemon956/lemon-nvim.git ~/.config/nvim
+```
+
+配置完成后，建议平时就多打开练一练。应急场景里最怕的不是工具缺功能，而是工具明明装好了，真正要用的时候忘了快捷键。
+
+## 总结
+
+这套配置的目标不是让平板替代电脑，而是让你在没有电脑的时候，手里仍然有一套能处理问题的工具链。
+
+Termux 负责提供命令行环境，Bitwarden 解决账号和密钥获取，fish 改善输入体验，tmux 负责多任务切换，Neovim 处理轻量编辑。它们组合起来之后，平板就不只是看剧和盖泡面的设备了，而是一台可以在关键时刻顶上的应急开发机。
