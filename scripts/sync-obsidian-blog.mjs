@@ -87,7 +87,7 @@ function readConfig() {
     username: requireEnv('OBSIDIAN_WEBDAV_USERNAME'),
     passwordEnv: 'OBSIDIAN_WEBDAV_PASSWORD',
     password: requireEnv('OBSIDIAN_WEBDAV_PASSWORD'),
-    sourceDir: normalizeWebdavDirectory(process.env.OBSIDIAN_SYNC_SOURCE_DIR || 'blog'),
+    sourceDir: normalizeWebdavDirectory(process.env.OBSIDIAN_SYNC_SOURCE_DIR || 'lemon/blog'),
     outputDir: normalizeWebdavDirectory(
       process.env.OBSIDIAN_SYNC_OUTPUT_DIR || 'data/blog/obsidian'
     ),

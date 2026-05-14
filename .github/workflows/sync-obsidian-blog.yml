@@ -40,9 +40,9 @@ jobs:
           OBSIDIAN_WEBDAV_URL: ${{ secrets.OBSIDIAN_WEBDAV_URL }}
           OBSIDIAN_WEBDAV_USERNAME: ${{ secrets.OBSIDIAN_WEBDAV_USERNAME }}
           OBSIDIAN_WEBDAV_PASSWORD: ${{ secrets.OBSIDIAN_WEBDAV_PASSWORD }}
-          OBSIDIAN_SYNC_SOURCE_DIR: blog
-          OBSIDIAN_SYNC_OUTPUT_DIR: data/blog/obsidian
-          OBSIDIAN_SYNC_WRITE_DIR: Inbox/Hermes
+          OBSIDIAN_SYNC_SOURCE_DIR: ${{ vars.OBSIDIAN_SYNC_SOURCE_DIR || 'lemon/blog' }}
+          OBSIDIAN_SYNC_OUTPUT_DIR: ${{ vars.OBSIDIAN_SYNC_OUTPUT_DIR || 'data/blog/obsidian' }}
+          OBSIDIAN_SYNC_WRITE_DIR: ${{ vars.OBSIDIAN_SYNC_WRITE_DIR || 'Inbox/Hermes' }}
 
       - name: Build generated content
         run: npm run build

@@ -76,6 +76,17 @@ test('buildOutputPath maps Obsidian blog paths into the generated blog directory
   )
 })
 
+test('buildOutputPath strips nested WebDAV source directory prefixes', () => {
+  assert.equal(
+    buildOutputPath({
+      remotePath: 'lemon/blog/algorithms/Two Sum.md',
+      sourceDir: 'lemon/blog',
+      outputDir: 'data/blog/obsidian',
+    }),
+    'data/blog/obsidian/algorithms/Two Sum.mdx'
+  )
+})
+
 test('normalizeWebdavDirectory removes surrounding slashes', () => {
   assert.equal(normalizeWebdavDirectory('/blog/'), 'blog')
 })
