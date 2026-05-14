@@ -51,17 +51,20 @@ body
   )
 })
 
-test('getPublishablePost fails done posts missing required blog fields', () => {
-  assert.throws(
-    () =>
-      getPublishablePost(`---
+test('getPublishablePost skips done posts missing required blog fields', () => {
+  assert.deepEqual(
+    getPublishablePost(`---
 title: Missing date
 status: done
 ---
 
 body
 `),
-    /status: done post is missing required frontmatter: date/
+    {
+      ok: false,
+      reason: 'missing_required_frontmatter',
+      missing: ['date'],
+    }
   )
 })
 

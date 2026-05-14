@@ -8,7 +8,7 @@ This project can sync completed Obsidian notes into the blog content directory.
 - Local generated directory: `data/blog/obsidian`
 - WebDAV controlled write directory in the generated `webdav-cli` config: `Inbox/Hermes`
 - Included notes: Markdown or MDX files with frontmatter `status: done`
-- Excluded notes: missing `status`, any status other than `done`, or `draft: true`
+- Excluded notes: missing `status`, any status other than `done`, `draft: true`, or missing required blog fields `title`/`date`
 
 The sync script clears only `data/blog/obsidian` before writing synced files. Existing hand-written posts outside that directory are left untouched. This project only uses `webdav-cli ls --json` and `webdav-cli cat` for the blog sync; it does not write, delete, move, copy, lock, or change properties in Obsidian.
 

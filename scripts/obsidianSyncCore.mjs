@@ -23,7 +23,11 @@ export function getPublishablePost(content) {
 
   const missing = ['title', 'date'].filter((field) => !parsed.data[field])
   if (missing.length > 0) {
-    throw new Error(`status: done post is missing required frontmatter: ${missing.join(', ')}`)
+    return {
+      ok: false,
+      reason: 'missing_required_frontmatter',
+      missing,
+    }
   }
 
   return {
