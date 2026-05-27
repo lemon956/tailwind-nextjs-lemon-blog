@@ -5,12 +5,14 @@ import 'remark-github-blockquote-alert/alert.css'
 import { Space_Grotesk } from 'next/font/google'
 import { Analytics, AnalyticsConfig } from 'pliny/analytics'
 import { SearchProvider, SearchConfig } from 'pliny/search'
+import PageAds from '@/components/ads/PageAds'
 import Header from '@/components/Header'
 import SectionContainer from '@/components/SectionContainer'
 import Footer from '@/components/Footer'
 import siteMetadata from '@/data/siteMetadata'
 import { ThemeProviders } from './theme-providers'
 import { Metadata } from 'next'
+import { getGoogleAdsenseScriptProps } from '../lib/adsConfig'
 
 const space_grotesk = Space_Grotesk({
   subsets: ['latin'],
@@ -94,16 +96,23 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <meta name="theme-color" media="(prefers-color-scheme: light)" content="#fbfff2" />
       <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0f172a" />
       <link rel="alternate" type="application/rss+xml" href={`${basePath}/feed.xml`} />
+      <script id="google-adsense" {...getGoogleAdsenseScriptProps()} />
       <body className="bg-gray-50 pl-[calc(100vw-100%)] text-gray-900 antialiased dark:bg-gray-950 dark:text-gray-50">
         <ThemeProviders>
           <Analytics analyticsConfig={siteMetadata.analytics as AnalyticsConfig} />
-          <SectionContainer>
-            <SearchProvider searchConfig={siteMetadata.search as SearchConfig}>
+          <SearchProvider searchConfig={siteMetadata.search as SearchConfig}>
+            <SectionContainer>
               <Header />
-              <main className="mb-auto">{children}</main>
-            </SearchProvider>
-            <Footer />
-          </SectionContainer>
+            </SectionContainer>
+            <PageAds>
+              <SectionContainer>
+                <main className="mb-auto">{children}</main>
+              </SectionContainer>
+            </PageAds>
+            <SectionContainer>
+              <Footer />
+            </SectionContainer>
+          </SearchProvider>
         </ThemeProviders>
       </body>
     </html>
