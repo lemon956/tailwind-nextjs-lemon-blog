@@ -16,8 +16,35 @@ export function isToolsRoute(pathname: string) {
   return pathname === '/tools' || pathname.startsWith('/tools/')
 }
 
-export function getAdPlacementForPathname(pathname: string): AdPlacement {
-  return isToolsRoute(pathname) ? 'bottom' : 'side'
+function normalizePathname(pathname: string) {
+  if (pathname.length > 1 && pathname.endsWith('/')) {
+    return pathname.slice(0, -1)
+  }
+
+  return pathname
+}
+
+export function isToolDetailRoute(pathname: string) {
+  const normalizedPathname = normalizePathname(pathname)
+
+  return normalizedPathname.startsWith('/tools/') && normalizedPathname !== '/tools'
+}
+
+export function isArticleRoute(pathname: string) {
+  const normalizedPathname = normalizePathname(pathname)
+
+  return (
+    normalizedPathname.startsWith('/blog/') &&
+    normalizedPathname !== '/blog' &&
+    !normalizedPathname.startsWith('/blog/page/')
+  )
+}
+
+export function getAdPlacementForPathname(pathname: string): AdPlacement | null {
+  if (isToolDetailRoute(pathname)) return 'bottom'
+  if (isArticleRoute(pathname)) return 'side'
+
+  return null
 }
 
 export function getGoogleAdsenseScriptProps() {
@@ -25,6 +52,13 @@ export function getGoogleAdsenseScriptProps() {
     async: true,
     crossOrigin: 'anonymous',
     src: `https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${GOOGLE_ADSENSE_CLIENT_ID}`,
+  } as const
+}
+
+export function getGoogleAdsenseAccountMeta() {
+  return {
+    name: 'google-adsense-account',
+    content: GOOGLE_ADSENSE_CLIENT_ID,
   } as const
 }
 

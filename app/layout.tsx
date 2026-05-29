@@ -12,13 +12,15 @@ import Footer from '@/components/Footer'
 import siteMetadata from '@/data/siteMetadata'
 import { ThemeProviders } from './theme-providers'
 import { Metadata } from 'next'
-import { getGoogleAdsenseScriptProps } from '../lib/adsConfig'
+import { getGoogleAdsenseAccountMeta, getGoogleAdsenseScriptProps } from '../lib/adsConfig'
 
 const space_grotesk = Space_Grotesk({
   subsets: ['latin'],
   display: 'swap',
   variable: '--font-space-grotesk',
 })
+
+const openGraphLocale = siteMetadata.locale.replace('-', '_')
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteMetadata.siteUrl),
@@ -33,7 +35,7 @@ export const metadata: Metadata = {
     url: './',
     siteName: siteMetadata.title,
     images: [siteMetadata.socialBanner],
-    locale: 'en_US',
+    locale: openGraphLocale,
     type: 'website',
   },
   alternates: {
@@ -96,6 +98,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <meta name="theme-color" media="(prefers-color-scheme: light)" content="#fbfff2" />
       <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0f172a" />
       <link rel="alternate" type="application/rss+xml" href={`${basePath}/feed.xml`} />
+      <meta {...getGoogleAdsenseAccountMeta()} />
       <script id="google-adsense" {...getGoogleAdsenseScriptProps()} />
       <body className="bg-gray-50 pl-[calc(100vw-100%)] text-gray-900 antialiased dark:bg-gray-950 dark:text-gray-50">
         <ThemeProviders>

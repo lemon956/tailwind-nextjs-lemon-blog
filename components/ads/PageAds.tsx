@@ -16,6 +16,10 @@ export default function PageAds({ children }: { children: ReactNode }) {
   const placement = getAdPlacementForPathname(pathname)
   const slots = getManualAdSlots()
 
+  if (!placement) {
+    return <>{children}</>
+  }
+
   if (placement === 'bottom') {
     return (
       <>
