@@ -1,12 +1,16 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import {
+import * as obsidianSyncCore from './obsidianSyncCore.mjs'
+
+const {
   buildOutputPath,
+  buildObsidianAssetCandidates,
   getPublishablePost,
   normalizeWebdavDirectory,
   renderWebdavConfig,
-} from './obsidianSyncCore.mjs'
+  rewriteObsidianAssetEmbeds,
+} = obsidianSyncCore
 
 test('getPublishablePost accepts only status done posts', () => {
   const post = getPublishablePost(`---
@@ -108,4 +112,85 @@ test('renderWebdavConfig uses the current webdav-cli write directory model', () 
   assert.match(config, /readonly_dirs:\n {4}- "blog"/)
   assert.match(config, /allow_delete: false/)
   assert.match(config, /allow_move: false/)
+})
+
+test('rewriteObsidianAssetEmbeds converts embedded image links to public markdown images', () => {
+  assert.equal(typeof rewriteObsidianAssetEmbeds, 'function')
+
+  const rewritten = rewriteObsidianAssetEmbeds({
+    content: `Before
+
+![[termux_start.jpg|Termux start]]
+
+After`,
+    remotePath: 'lemon/blog/Termux Dev.md',
+    sourceDir: 'lemon/blog',
+    outputPath: 'data/blog/obsidian/Termux Dev.mdx',
+    assetOutputDir: 'public/static/obsidian',
+  })
+
+  assert.equal(
+    rewritten.content,
+    `Before
+
+![Termux start](/static/obsidian/Termux%20Dev/termux_start.jpg)
+
+After`
+  )
+  assert.deepEqual(rewritten.assets, [
+    {
+      target: 'termux_start.jpg',
+      outputPath: 'public/static/obsidian/Termux Dev/termux_start.jpg',
+      publicPath: '/static/obsidian/Termux%20Dev/termux_start.jpg',
+      candidates: ['lemon/blog/termux_start.jpg'],
+    },
+  ])
+})
+
+test('rewriteObsidianAssetEmbeds leaves regular wikilinks unchanged and deduplicates assets', () => {
+  assert.equal(typeof rewriteObsidianAssetEmbeds, 'function')
+
+  const rewritten = rewriteObsidianAssetEmbeds({
+    content: `See [[Termux Dev]].
+
+![[images/start.png]]
+![[images/start.png]]`,
+    remotePath: 'lemon/blog/posts/Termux Dev.md',
+    sourceDir: 'lemon/blog',
+    outputPath: 'data/blog/obsidian/posts/Termux Dev.mdx',
+    assetOutputDir: 'public/static/obsidian',
+    assetDirs: ['lemon/assets'],
+  })
+
+  assert.equal(
+    rewritten.content,
+    `See [[Termux Dev]].
+
+![start](/static/obsidian/posts/Termux%20Dev/images/start.png)
+![start](/static/obsidian/posts/Termux%20Dev/images/start.png)`
+  )
+  assert.equal(rewritten.assets.length, 1)
+  assert.deepEqual(rewritten.assets[0].candidates, [
+    'lemon/blog/posts/images/start.png',
+    'lemon/assets/images/start.png',
+  ])
+})
+
+test('buildObsidianAssetCandidates checks note-relative paths before configured asset dirs', () => {
+  assert.equal(typeof buildObsidianAssetCandidates, 'function')
+
+  assert.deepEqual(
+    buildObsidianAssetCandidates({
+      target: 'termux_start.jpg',
+      remotePath: 'lemon/blog/posts/Termux Dev.md',
+      sourceDir: 'lemon/blog',
+      assetDirs: ['lemon/blog/assets', '/lemon/shared-assets/'],
+    }),
+    [
+      'lemon/blog/posts/termux_start.jpg',
+      'lemon/blog/assets/termux_start.jpg',
+      'lemon/shared-assets/termux_start.jpg',
+      'lemon/blog/termux_start.jpg',
+    ]
+  )
 })

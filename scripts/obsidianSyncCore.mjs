@@ -1,6 +1,31 @@
 import path from 'node:path'
 import matter from 'gray-matter'
 
+const OBSIDIAN_EMBED_RE = /!\[\[([^\]\n]+)\]\]/g
+const IMAGE_EXTENSIONS = new Set([
+  '.apng',
+  '.avif',
+  '.bmp',
+  '.gif',
+  '.ico',
+  '.jpeg',
+  '.jpg',
+  '.png',
+  '.svg',
+  '.webp',
+])
+const ASSET_EXTENSIONS = new Set([
+  ...IMAGE_EXTENSIONS,
+  '.m4a',
+  '.mov',
+  '.mp3',
+  '.mp4',
+  '.ogg',
+  '.pdf',
+  '.wav',
+  '.webm',
+])
+
 export function normalizeWebdavDirectory(value) {
   return String(value || '')
     .trim()
@@ -53,6 +78,74 @@ export function isMarkdownPath(remotePath) {
   return /\.(md|mdx)$/i.test(remotePath)
 }
 
+export function rewriteObsidianAssetEmbeds({
+  content,
+  remotePath,
+  sourceDir,
+  outputPath,
+  assetOutputDir = 'public/static/obsidian',
+  assetDirs = [],
+}) {
+  const assets = new Map()
+  const rewritten = String(content || '').replace(OBSIDIAN_EMBED_RE, (match, rawEmbed) => {
+    const embed = parseObsidianAssetEmbed(rawEmbed)
+    if (!embed || !isSupportedAsset(embed.target)) {
+      return match
+    }
+
+    const postAssetDir = buildPostAssetDirectory(outputPath)
+    const outputPathForAsset = path.posix.join(
+      normalizeWebdavDirectory(assetOutputDir),
+      postAssetDir,
+      embed.target
+    )
+    const publicPath = buildPublicAssetPath(outputPathForAsset)
+    const key = outputPathForAsset
+
+    if (!assets.has(key)) {
+      assets.set(key, {
+        target: embed.target,
+        outputPath: outputPathForAsset,
+        publicPath,
+        candidates: buildObsidianAssetCandidates({
+          target: embed.target,
+          remotePath,
+          sourceDir,
+          assetDirs,
+        }),
+      })
+    }
+
+    const label = embed.label || path.posix.basename(embed.target, path.posix.extname(embed.target))
+    if (isImageAsset(embed.target)) {
+      return `![${escapeMarkdownLabel(label)}](${publicPath})`
+    }
+    return `[${escapeMarkdownLabel(label)}](${publicPath})`
+  })
+
+  return {
+    content: rewritten,
+    assets: [...assets.values()],
+  }
+}
+
+export function buildObsidianAssetCandidates({ target, remotePath, sourceDir, assetDirs = [] }) {
+  const normalizedTarget = normalizeObsidianAssetTarget(target)
+  const noteDir = normalizeWebdavDirectory(path.posix.dirname(normalizeWebdavDirectory(remotePath)))
+  const normalizedSourceDir = normalizeWebdavDirectory(sourceDir)
+  const candidates = []
+
+  addUniquePath(candidates, path.posix.join(noteDir, normalizedTarget))
+  for (const assetDir of assetDirs) {
+    addUniquePath(candidates, path.posix.join(normalizeWebdavDirectory(assetDir), normalizedTarget))
+  }
+  if (!normalizedTarget.includes('/')) {
+    addUniquePath(candidates, path.posix.join(normalizedSourceDir, normalizedTarget))
+  }
+
+  return candidates
+}
+
 export function renderWebdavConfig(config) {
   const sourceDir = normalizeWebdavDirectory(config.sourceDir)
   const writeDir = normalizeWebdavDirectory(config.writeDir || 'Inbox/Hermes')
@@ -89,4 +182,89 @@ markdown:
 
 function yamlString(value) {
   return JSON.stringify(String(value || ''))
+}
+
+function parseObsidianAssetEmbed(rawEmbed) {
+  const [rawTarget, rawLabel] = String(rawEmbed || '').split('|')
+  const target = normalizeObsidianAssetTarget(rawTarget.split('#')[0])
+  if (!target) {
+    return null
+  }
+
+  return {
+    target,
+    label: normalizeObsidianLabel(rawLabel),
+  }
+}
+
+function normalizeObsidianAssetTarget(value) {
+  const normalized = path.posix.normalize(
+    String(value || '')
+      .trim()
+      .replace(/\\/g, '/')
+      .replace(/^\/+/, '')
+  )
+
+  if (!normalized || normalized === '.') {
+    return ''
+  }
+  if (normalized === '..' || normalized.startsWith('../') || normalized.includes('/../')) {
+    throw new Error(`Unsafe Obsidian asset reference: ${value}`)
+  }
+
+  return normalized
+}
+
+function normalizeObsidianLabel(value) {
+  const label = String(value || '').trim()
+  if (!label || /^\d+(x\d+)?$/i.test(label)) {
+    return ''
+  }
+  return label
+}
+
+function isSupportedAsset(target) {
+  return ASSET_EXTENSIONS.has(path.posix.extname(target).toLowerCase())
+}
+
+function isImageAsset(target) {
+  return IMAGE_EXTENSIONS.has(path.posix.extname(target).toLowerCase())
+}
+
+function buildPostAssetDirectory(outputPath) {
+  const normalizedOutput = normalizeWebdavDirectory(outputPath)
+  const parsed = path.posix.parse(normalizedOutput)
+  const postPath = path.posix.join(parsed.dir, parsed.name)
+
+  for (const prefix of ['data/blog/obsidian/', 'data/blog/']) {
+    if (postPath.startsWith(prefix)) {
+      return postPath.slice(prefix.length)
+    }
+  }
+
+  return postPath
+}
+
+function buildPublicAssetPath(outputPath) {
+  const normalized = normalizeWebdavDirectory(outputPath)
+  if (!normalized.startsWith('public/')) {
+    throw new Error(`Obsidian asset output must be under public/: ${outputPath}`)
+  }
+
+  return `/${normalized
+    .slice('public/'.length)
+    .split('/')
+    .map((part) => encodeURIComponent(part))
+    .join('/')}`
+}
+
+function escapeMarkdownLabel(value) {
+  return String(value || '').replace(/]/g, '\\]')
+}
+
+function addUniquePath(paths, value) {
+  const normalized = normalizeWebdavDirectory(value)
+  if (normalized && !paths.includes(normalized)) {
+    paths.push(normalized)
+  }
 }

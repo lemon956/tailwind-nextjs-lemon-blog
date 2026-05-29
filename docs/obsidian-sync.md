@@ -6,11 +6,16 @@ This project can sync completed Obsidian notes into the blog content directory.
 
 - Source WebDAV directory: `lemon/blog`
 - Local generated directory: `data/blog/obsidian`
+- Local generated attachment directory: `public/static/obsidian`
 - WebDAV controlled write directory in the generated `webdav-cli` config: `Inbox/Hermes`
 - Included notes: Markdown or MDX files with frontmatter `status: done`
 - Excluded notes: missing `status`, any status other than `done`, `draft: true`, or missing required blog fields `title`/`date`
 
-The sync script clears only `data/blog/obsidian` before writing synced files. Existing hand-written posts outside that directory are left untouched. This project only uses `webdav-cli ls --json` and `webdav-cli cat` for the blog sync; it does not write, delete, move, copy, lock, or change properties in Obsidian.
+The sync script clears only `data/blog/obsidian` and `public/static/obsidian` before writing synced files. Existing hand-written posts and images outside those generated directories are left untouched. This project only uses `webdav-cli ls --json` and `webdav-cli cat` for the blog sync; it does not write, delete, move, copy, lock, or change properties in Obsidian.
+
+Embedded Obsidian asset links such as `![[termux_start.jpg]]` and `![[termux_start.jpg|Termux start]]` are rewritten to Markdown image links and copied into `public/static/obsidian/<post-path>/`. The sync checks the note's WebDAV directory first. If the attachment is stored somewhere else, set `OBSIDIAN_SYNC_ASSET_DIRS` to one or more WebDAV directories separated by commas or newlines.
+
+If a published note references an attachment that cannot be read, the sync fails instead of committing a broken article.
 
 ## Local Sync
 
@@ -27,6 +32,9 @@ export OBSIDIAN_WEBDAV_URL="https://example.com/obsidian-webdav/"
 export OBSIDIAN_WEBDAV_USERNAME="hermes"
 export OBSIDIAN_WEBDAV_PASSWORD="your-password"
 export OBSIDIAN_SYNC_SOURCE_DIR="lemon/blog"
+export OBSIDIAN_SYNC_ASSET_OUTPUT_DIR="public/static/obsidian"
+# Optional, only needed when attachments live outside the note directory or source directory.
+export OBSIDIAN_SYNC_ASSET_DIRS="lemon/assets,lemon/blog/assets"
 export OBSIDIAN_SYNC_WRITE_DIR="Inbox/Hermes"
 ```
 
@@ -60,9 +68,9 @@ OBSIDIAN_WEBDAV_USERNAME
 OBSIDIAN_WEBDAV_PASSWORD
 ```
 
-The workflow installs `webdav-cli` from `https://github.com/lemon956/obsidian-cli`, runs `npm run sync:obsidian`, runs `npm run build`, and commits changes in `data/blog/obsidian` plus `app/tag-data.json` when generated content changes.
+The workflow installs `webdav-cli` from `https://github.com/lemon956/obsidian-cli`, runs `npm run sync:obsidian`, runs `npm run build`, and commits changes in `data/blog/obsidian`, `public/static/obsidian`, and `app/tag-data.json` when generated content changes.
 
-The workflow defaults to `OBSIDIAN_SYNC_SOURCE_DIR=lemon/blog`, matching the WebDAV paths returned by `webdav-cli` for this vault. You can override `OBSIDIAN_SYNC_SOURCE_DIR`, `OBSIDIAN_SYNC_OUTPUT_DIR`, or `OBSIDIAN_SYNC_WRITE_DIR` in GitHub repository Variables without changing the workflow file.
+The workflow defaults to `OBSIDIAN_SYNC_SOURCE_DIR=lemon/blog`, matching the WebDAV paths returned by `webdav-cli` for this vault. You can override `OBSIDIAN_SYNC_SOURCE_DIR`, `OBSIDIAN_SYNC_OUTPUT_DIR`, `OBSIDIAN_SYNC_ASSET_OUTPUT_DIR`, `OBSIDIAN_SYNC_ASSET_DIRS`, or `OBSIDIAN_SYNC_WRITE_DIR` in GitHub repository Variables without changing the workflow file.
 
 `webdav-cli` 0.1.3 keeps read commands unchanged (`ls`, `cat`, `search`) and adds controlled WebDAV method commands such as `delete`, `move`, `copy`, `proppatch`, `lock`, and `unlock`. Those method commands are restricted to `behavior.allow_write_dirs`; `delete` and `move` also require `behavior.allow_delete` or `behavior.allow_move`. The sync config keeps those destructive switches disabled.
 

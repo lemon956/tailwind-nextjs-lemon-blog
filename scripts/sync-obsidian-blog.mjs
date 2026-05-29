@@ -11,6 +11,7 @@ import {
   isMarkdownPath,
   normalizeWebdavDirectory,
   renderWebdavConfig,
+  rewriteObsidianAssetEmbeds,
 } from './obsidianSyncCore.mjs'
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
@@ -46,16 +47,44 @@ async function main() {
         throw new Error(`multiple Obsidian notes map to the same output path: ${outputPath}`)
       }
       seenOutputs.add(outputPath)
-      publishable.push({ remotePath, outputPath, content: post.content })
+      const rewritten = rewriteObsidianAssetEmbeds({
+        content: post.content,
+        remotePath,
+        sourceDir: config.sourceDir,
+        outputPath,
+        assetOutputDir: config.assetOutputDir,
+        assetDirs: config.assetDirs,
+      })
+      publishable.push({
+        remotePath,
+        outputPath,
+        content: rewritten.content,
+        assets: rewritten.assets,
+      })
+    }
+
+    const assets = collectAssets(publishable)
+    const resolvedAssets = []
+    for (const asset of assets) {
+      const resolved = await readAsset(config, configPath, asset)
+      resolvedAssets.push({ asset, content: resolved.content })
     }
 
     if (!dryRun) {
       await fs.rm(path.join(rootDir, config.outputDir), { recursive: true, force: true })
+      await fs.rm(path.join(rootDir, config.assetOutputDir), { recursive: true, force: true })
       await fs.mkdir(path.join(rootDir, config.outputDir), { recursive: true })
+      await fs.mkdir(path.join(rootDir, config.assetOutputDir), { recursive: true })
       for (const post of publishable) {
         const absoluteOutput = path.join(rootDir, post.outputPath)
         await fs.mkdir(path.dirname(absoluteOutput), { recursive: true })
         await fs.writeFile(absoluteOutput, post.content, 'utf8')
+      }
+
+      for (const { asset, content } of resolvedAssets) {
+        const absoluteOutput = path.join(rootDir, asset.outputPath)
+        await fs.mkdir(path.dirname(absoluteOutput), { recursive: true })
+        await fs.writeFile(absoluteOutput, content)
       }
     }
 
@@ -66,8 +95,11 @@ async function main() {
           action: dryRun ? 'planned' : 'synced',
           sourceDir: config.sourceDir,
           outputDir: config.outputDir,
+          assetOutputDir: config.assetOutputDir,
           scanned: remoteFiles.length,
           synced: publishable.length,
+          assetReferences: assets.length,
+          syncedAssets: dryRun ? 0 : resolvedAssets.length,
           skipped: skipped.length,
           skippedByReason: countByReason(skipped),
         },
@@ -91,6 +123,10 @@ function readConfig() {
     outputDir: normalizeWebdavDirectory(
       process.env.OBSIDIAN_SYNC_OUTPUT_DIR || 'data/blog/obsidian'
     ),
+    assetOutputDir: normalizeWebdavDirectory(
+      process.env.OBSIDIAN_SYNC_ASSET_OUTPUT_DIR || 'public/static/obsidian'
+    ),
+    assetDirs: parseDirectoryList(process.env.OBSIDIAN_SYNC_ASSET_DIRS || ''),
     writeDir: normalizeWebdavDirectory(process.env.OBSIDIAN_SYNC_WRITE_DIR || 'Inbox/Hermes'),
   }
 }
@@ -131,21 +167,54 @@ async function runWebdavCli(config, configPath, args) {
     ...process.env,
     [config.passwordEnv]: config.password,
   }
-  return runCommand(config.cli, ['--config', configPath, ...args], env)
+  const output = await runCommandBuffer(config.cli, ['--config', configPath, ...args], env)
+  return output.toString('utf8').trimEnd()
 }
 
-function runCommand(command, args, env) {
+async function readAsset(config, configPath, asset) {
+  const errors = []
+
+  for (const candidate of asset.candidates) {
+    try {
+      const content = await runWebdavCliBuffer(config, configPath, ['cat', candidate])
+      return { remotePath: candidate, content }
+    } catch (error) {
+      errors.push(`${candidate}: ${error.message}`)
+    }
+  }
+
+  throw new Error(
+    [
+      `Unable to read Obsidian asset "${asset.target}" for ${asset.outputPath}.`,
+      `Tried: ${asset.candidates.join(', ') || '(no candidates)'}.`,
+      `Set OBSIDIAN_SYNC_ASSET_DIRS if the file lives outside ${config.sourceDir}.`,
+      errors.length > 0 ? `Errors: ${errors.join(' | ')}` : '',
+    ]
+      .filter(Boolean)
+      .join(' ')
+  )
+}
+
+async function runWebdavCliBuffer(config, configPath, args) {
+  const env = {
+    ...process.env,
+    [config.passwordEnv]: config.password,
+  }
+  return runCommandBuffer(config.cli, ['--config', configPath, ...args], env)
+}
+
+function runCommandBuffer(command, args, env) {
   return new Promise((resolve, reject) => {
     const child = spawn(command, args, {
       cwd: rootDir,
       env,
       stdio: ['ignore', 'pipe', 'pipe'],
     })
-    let stdout = ''
+    const stdout = []
     let stderr = ''
 
     child.stdout.on('data', (chunk) => {
-      stdout += chunk
+      stdout.push(chunk)
     })
     child.stderr.on('data', (chunk) => {
       stderr += chunk
@@ -153,12 +222,31 @@ function runCommand(command, args, env) {
     child.on('error', reject)
     child.on('close', (code) => {
       if (code === 0) {
-        resolve(stdout.trimEnd())
+        resolve(Buffer.concat(stdout))
         return
       }
       reject(new Error(`${command} ${args.join(' ')} failed with exit ${code}: ${stderr.trim()}`))
     })
   })
+}
+
+function collectAssets(posts) {
+  const assets = new Map()
+  for (const post of posts) {
+    for (const asset of post.assets || []) {
+      if (!assets.has(asset.outputPath)) {
+        assets.set(asset.outputPath, asset)
+      }
+    }
+  }
+  return [...assets.values()]
+}
+
+function parseDirectoryList(value) {
+  return String(value || '')
+    .split(/[\n,]/)
+    .map(normalizeWebdavDirectory)
+    .filter(Boolean)
 }
 
 function countByReason(skipped) {
