@@ -1,7 +1,17 @@
 'use client'
 
-import { memo, useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
+import {
+  memo,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react'
 import { ToolButton, ToolNotice, ToolPanel, ToolWorkbench } from '@/components/tools/ToolWorkbench'
+import { LineNumberedTextArea } from '@/components/tools/LineNumberedTextArea'
+import { MeasuredLineNumbers } from '@/components/tools/MeasuredLineNumbers'
 import {
   calculateTextMatches,
   getCenteredScrollOffset,
@@ -14,6 +24,7 @@ type FixOption =
   | 'trim-whitespace'
   | 'fix-escaped-json'
   | 'fix-newlines'
+  | 'strip-newlines'
   | 'normalize-newlines'
   | 'remove-empty-lines'
 
@@ -27,6 +38,11 @@ const FIX_OPTIONS: { value: FixOption; label: string; description: string }[] = 
     description: '处理裸露转义格式，如 {\\"key\\":\\"value\\"}',
   },
   { value: 'fix-newlines', label: '修复换行符错误', description: '移除键名和值中的非法换行符' },
+  {
+    value: 'strip-newlines',
+    label: '去除所有换行符',
+    description: '移除所有换行符（含字符串内导致解析失败的换行），合并为单行后再格式化',
+  },
   { value: 'normalize-newlines', label: '标准化换行符', description: '将 CRLF 和 CR 统一为 LF' },
   { value: 'remove-empty-lines', label: '移除多余空行', description: '删除连续超过两个的空行' },
 ]
@@ -50,21 +66,6 @@ const searchNavButtonClass =
   'min-h-10 rounded-md border border-gray-300 bg-white px-3 py-2 text-xs font-semibold text-gray-700 shadow-sm transition-colors hover:border-sky-400 hover:text-sky-700 disabled:cursor-not-allowed disabled:opacity-40 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-200 dark:hover:border-sky-500 dark:hover:text-sky-300'
 
 const formatterPaneHeightClass = 'h-[clamp(680px,72vh,900px)]'
-
-function LineNumbers({ text }: { text: string }) {
-  return (
-    <div className="min-w-12 border-r border-gray-200 bg-gray-50 px-3 py-4 text-right dark:border-gray-800 dark:bg-gray-900">
-      {Array.from({ length: countLines(text) }).map((_, index) => (
-        <div
-          key={index}
-          className="font-mono text-xs leading-6 text-gray-400 select-none dark:text-gray-500"
-        >
-          {index + 1}
-        </div>
-      ))}
-    </div>
-  )
-}
 
 function HighlightText({ text, searchQuery }: { text: string; searchQuery: string }) {
   const normalizedQuery = searchQuery.trim()
@@ -151,8 +152,9 @@ const JsonNode = memo(function JsonNode({
 
     return (
       <div
+        data-json-row
         style={{ paddingLeft: `${indentPx}px` }}
-        className="group relative rounded py-0.5 font-mono text-sm leading-6 hover:bg-gray-100 dark:hover:bg-gray-900"
+        className="group relative rounded py-0.5 font-mono text-sm leading-6 break-words hover:bg-gray-100 dark:hover:bg-gray-900"
         onMouseEnter={() => setShowCopy(true)}
         onMouseLeave={() => setShowCopy(false)}
       >
@@ -197,6 +199,7 @@ const JsonNode = memo(function JsonNode({
   return (
     <div className="font-mono text-sm">
       <div
+        data-json-row
         style={{ paddingLeft: `${indentPx}px` }}
         className="group relative rounded py-0.5 leading-6 hover:bg-gray-100 dark:hover:bg-gray-900"
         onMouseEnter={() => setShowCopy(true)}
@@ -272,6 +275,7 @@ const JsonNode = memo(function JsonNode({
                 />
               ))}
           <div
+            data-json-row
             style={{ paddingLeft: `${indentPx}px` }}
             className="rounded py-0.5 leading-6 hover:bg-gray-100 dark:hover:bg-gray-900"
           >
@@ -361,9 +365,11 @@ export default function JsonFormatter() {
   const [outputSearchQuery, setOutputSearchQuery] = useState('')
   const [outputSearchIndex, setOutputSearchIndex] = useState(-1)
   const [visibleSearchMatchCount, setVisibleSearchMatchCount] = useState(0)
+  const [outputLineHeights, setOutputLineHeights] = useState<number[]>([])
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const outputSearchInputRef = useRef<HTMLInputElement>(null)
   const outputScrollRef = useRef<HTMLDivElement>(null)
+  const outputContentRef = useRef<HTMLDivElement>(null)
 
   const searchMatchCount = visibleSearchMatchCount
   const currentSearchPosition =
@@ -576,6 +582,27 @@ export default function JsonFormatter() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [indent])
 
+  // 测量输出区实际渲染出的每一行高度，行号据此精准对齐（折叠/折行都不错位）
+  useLayoutEffect(() => {
+    const container = outputContentRef.current
+    if (!container) {
+      setOutputLineHeights([])
+      return
+    }
+
+    const measure = () => {
+      const rows = container.querySelectorAll<HTMLElement>('[data-json-row]')
+      setOutputLineHeights(Array.from(rows, (row) => row.offsetHeight))
+    }
+
+    measure()
+
+    // 折叠改变总高度、改宽触发折行都会回调，从而重新测量
+    const observer = new ResizeObserver(measure)
+    observer.observe(container)
+    return () => observer.disconnect()
+  }, [output, parsedJson, indent, isCompressed])
+
   const showCopyToast = () => {
     setShowToast(true)
     window.setTimeout(() => setShowToast(false), 2000)
@@ -690,6 +717,17 @@ export default function JsonFormatter() {
         if (keyFixed) logs.push('修复了键名中的换行符')
         if (valueFixed) logs.push('修复了字符串值中的换行符')
         if (!keyFixed && !valueFixed && !applyAll) logs.push('未检测到需要修复的换行符')
+      }
+
+      // 整段去换行属于破坏性操作，不并入「全部修复」，仅在用户显式选择时执行
+      if (option === 'strip-newlines') {
+        const next = text.replace(/\r\n?|\n/g, '')
+        if (next !== text) {
+          logs.push('去除了所有换行符')
+          text = next
+        } else {
+          logs.push('未检测到换行符')
+        }
       }
 
       if (applyAll || option === 'normalize-newlines') {
@@ -867,23 +905,17 @@ export default function JsonFormatter() {
       }
     >
       <ToolPanel title="输入 JSON" meta={formatMeta(input)}>
-        <div
-          className={`flex ${formatterPaneHeightClass} overflow-hidden bg-white dark:bg-gray-950`}
-        >
-          <LineNumbers text={input} />
-          <textarea
-            ref={inputRef}
-            id="json-input"
-            value={input}
-            onChange={(event) => {
-              const textarea = event.target
-              updateInput(textarea.value, false, textarea.selectionStart)
-            }}
-            placeholder="在此粘贴或输入 JSON 数据..."
-            className="h-full flex-1 resize-none overflow-auto bg-transparent p-4 font-mono text-sm leading-6 text-gray-900 focus:outline-none dark:text-gray-100"
-            spellCheck={false}
-          />
-        </div>
+        <LineNumberedTextArea
+          textareaRef={inputRef}
+          id="json-input"
+          value={input}
+          onChange={(event) => {
+            const textarea = event.target
+            updateInput(textarea.value, false, textarea.selectionStart)
+          }}
+          placeholder="在此粘贴或输入 JSON 数据..."
+          className={`${formatterPaneHeightClass} bg-white dark:bg-gray-950`}
+        />
       </ToolPanel>
 
       <ToolPanel
@@ -961,22 +993,27 @@ export default function JsonFormatter() {
             </div>
           )}
 
+          {!isCompressed && parsedJson != null && output.length > 50000 && (
+            <div className="shrink-0 px-3 pt-3">
+              <ToolNotice tone="info">
+                数据量较大，建议使用压缩模式查看或搜索以获得更好的性能。
+              </ToolNotice>
+            </div>
+          )}
           {output || parsedJson ? (
             <div ref={outputScrollRef} className="min-h-0 flex-1 overflow-auto">
               <div className="flex min-h-full">
-                {output && <LineNumbers text={output} />}
-                <div className="min-w-0 flex-1">
+                {output && <MeasuredLineNumbers heights={outputLineHeights} />}
+                <div ref={outputContentRef} className="min-w-0 flex-1">
                   {isCompressed && output ? (
-                    <pre className="min-w-max p-4 font-mono text-sm leading-6 whitespace-pre text-gray-900 dark:text-gray-100">
+                    <pre
+                      data-json-row
+                      className="p-4 font-mono text-sm leading-6 break-words whitespace-pre-wrap text-gray-900 dark:text-gray-100"
+                    >
                       {renderHighlightedText(output, activeOutputSearchQuery)}
                     </pre>
                   ) : parsedJson ? (
-                    <div className="min-w-max p-4">
-                      {output.length > 50000 && (
-                        <ToolNotice tone="info">
-                          数据量较大，建议使用压缩模式查看或搜索以获得更好的性能。
-                        </ToolNotice>
-                      )}
+                    <div className="p-4">
                       <JsonNode
                         data={parsedJson}
                         indent={indent}
