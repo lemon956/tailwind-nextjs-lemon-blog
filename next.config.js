@@ -70,6 +70,13 @@ module.exports = () => {
     allowedDevOrigins: allowedDevOrigins,
     reactStrictMode: true,
     trailingSlash: false,
+    // 控制构建内存：默认会按 CPU 核数 fork worker，在 Vercel 上 os.cpus() 常返回
+    // 宿主机核数，导致 fork 出几十个 worker、各自占数百 MB 而 OOM。这里收紧并行。
+    experimental: {
+      cpus: 2,
+      staticGenerationMaxConcurrency: 2,
+      webpackMemoryOptimizations: true,
+    },
     pageExtensions: ['ts', 'tsx', 'js', 'jsx', 'md', 'mdx'],
     onDemandEntries: {
       maxInactiveAge: 60 * 60 * 1000,

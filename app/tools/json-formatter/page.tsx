@@ -349,6 +349,65 @@ function parseJSON(text: string) {
   return parsed
 }
 
+/**
+ * 仅移除「字符串字面量内部」的真实换行符（CR/LF）——这类字符在 JSON 字符串里非法
+ * （Bad control character）。结构性换行（token 之间的换行，属于合法空白）保持不动。
+ * 通过逐字符扫描跟踪是否处于字符串中，并正确处理转义。
+ */
+function removeNewlinesInStrings(text: string): string {
+  let result = ''
+  let inString = false
+  let escaped = false
+
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i]
+
+    if (escaped) {
+      result += ch
+      escaped = false
+      continue
+    }
+    if (ch === '\\') {
+      result += ch
+      escaped = true
+      continue
+    }
+    if (ch === '"') {
+      inString = !inString
+      result += ch
+      continue
+    }
+    if (inString && (ch === '\n' || ch === '\r')) {
+      // 丢弃字符串内部的真实换行符
+      continue
+    }
+    result += ch
+  }
+
+  return result
+}
+
+/**
+ * 处理「多个并列对象但缺少外层数组」的情况，例如 `{...},{...}`（逗号分隔）或
+ * `{...}{...}` / `{...}\n{...}`（JSON Lines）。尝试包裹成 `[...]` 并解析成功则返回。
+ */
+function parseConcatenatedAsArray(text: string): { text: string; parsed: unknown } | null {
+  const trimmed = text.trim()
+  if (!trimmed) return null
+
+  const candidates = [`[${trimmed}]`, `[${trimmed.replace(/}\s*{/g, '},{')}]`]
+  for (const candidate of candidates) {
+    try {
+      const parsed = JSON.parse(candidate)
+      return { text: candidate, parsed }
+    } catch {
+      // 尝试下一种包裹方式
+    }
+  }
+
+  return null
+}
+
 export default function JsonFormatter() {
   const [input, setInput] = useState('')
   const [output, setOutput] = useState('')
@@ -707,16 +766,13 @@ export default function JsonFormatter() {
       }
 
       if (applyAll || option === 'fix-newlines') {
-        const beforeFix = text
-        text = text.replace(/"([^"]*)\n([^"]*)":/g, '"$1$2":')
-        const keyFixed = text !== beforeFix
-        const beforeValueFix = text
-        text = text.replace(/:\s*"([^"]*)\n([^"]*)"/g, ': "$1$2"')
-        const valueFixed = text !== beforeValueFix
-
-        if (keyFixed) logs.push('修复了键名中的换行符')
-        if (valueFixed) logs.push('修复了字符串值中的换行符')
-        if (!keyFixed && !valueFixed && !applyAll) logs.push('未检测到需要修复的换行符')
+        const next = removeNewlinesInStrings(text)
+        if (next !== text) {
+          logs.push('移除了字符串内部的非法换行符')
+          text = next
+        } else if (!applyAll) {
+          logs.push('未检测到字符串内部的换行符')
+        }
       }
 
       // 整段去换行属于破坏性操作，不并入「全部修复」，仅在用户显式选择时执行
@@ -750,7 +806,25 @@ export default function JsonFormatter() {
         }
       }
 
-      const parsed = parseJSON(text)
+      // 最终校验：先直接解析；失败则尝试把「逗号/换行分隔的多个对象」包裹成数组
+      let parsed: unknown
+      try {
+        parsed = parseJSON(text)
+      } catch (directErr) {
+        const wrapped = parseConcatenatedAsArray(text)
+        if (wrapped) {
+          text = wrapped.text
+          parsed = wrapped.parsed
+          logs.push('检测到多个并列对象，已包裹为 JSON 数组')
+        } else {
+          // 即使最终仍非法，也把已清理的文本写回输入框，便于用户继续处理
+          updateInput(text, true, text.length)
+          setFixLog(logs)
+          setError(`修复后仍有错误: ${directErr instanceof Error ? directErr.message : '未知错误'}`)
+          return
+        }
+      }
+
       logs.push('JSON 格式验证通过')
 
       const charReduced = originalLength - text.length
